@@ -1,5 +1,5 @@
 // Cache Simulation Data Structures for ECE 585 Final Project
-// Version: 0.1
+// Version: 0.2
 // Cache Parameters
 parameter ADDRESS_WIDTH = 32; // Address width 
 parameter CACHE_SIZE    = 16 * 1024 * 1024; // 16MB cache size , all in BYTEs
@@ -24,9 +24,14 @@ typedef enum logic [1:0] {
 // Cache Line Structure
 // 
 typedef struct packed {
+    
     logic                 valid;        // Valid bit 
     logic [TAG_BITS-1:0]  tag;          // Tag bits 
     MESI_State_t          mesi_state;   // MESI state 
+
+    logic [INDEX_BITS-1:0] index;       // Set index
+    logic [OFFSET_BITS-1:0] offset;     // Byte Offset bits
+    logic                 dirty;        // Dirty bit
     // No LRU bits at line level, use pseudo-LRU at set level
 } CacheLine_t;
 
