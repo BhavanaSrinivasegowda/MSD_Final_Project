@@ -29,8 +29,9 @@ typedef struct packed {
     logic [TAG_BITS-1:0]  tag;          // Tag bits 
     MESI_State_t          mesi_state;   // MESI state 
 
-    logic [INDEX_BITS-1:0] index;       // Set index
-    logic [OFFSET_BITS-1:0] offset;     // Byte Offset bits
+//    logic [INDEX_BITS-1:0] index;       // Set index
+//    logic [OFFSET_BITS-1:0] offset;     // Byte Offset bits
+//     Dupilcated, doesn't needed
     logic                 dirty;        // Dirty bit
     // No LRU bits at line level, use pseudo-LRU at set level
 } CacheLine_t;
