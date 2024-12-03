@@ -106,9 +106,60 @@ module cache_simulator;
      * This function handles read requests, checks for cache hits or misses,
      * updates the MESI state, and performs necessary bus operations if required.
      */
-    task process_read_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
 
-    endtask
+    function integer get_lru_line_index(input logic [ASSOCIATIVITY-2:0] lru_state);
+    integer i;
+    for (i = 0; i < ASSOCIATIVITY; i++) begin
+        if (lru_state[i] == 0) begin
+            return i; // Return the index of the least recently used line
+        end
+    end
+    return -1; // If all lines are equally recently used, return -1 or some default value
+    endfunction
+    
+    task process_read_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
+    // Extract the index, tag, and offset from the address
+    logic [INDEX_BITS-1:0] index;
+    logic [OFFSET_BITS-1:0] offset;
+
+    tag = address[ADDRESS_WIDTH-1:ADDRESS_WIDTH-TAG_BITS];
+    index = address[OFFSET_BITS+TAG_BITS-1:OFFSET_BITS];
+    offset = address[OFFSET_BITS-1:0];
+
+    // Access the set corresponding to the index
+    CacheSet_t current_set = cache.sets[index];
+
+    // Initialize a flag to detect if the data was found (hit)
+    logic hit = 0;
+    integer i;
+    
+    // Search for the tag in the set's lines (associative lookup)
+    for (i = 0; i < ASSOCIATIVITY; i++) begin
+        if (current_set.lines[i].valid && current_set.lines[i].tag == tag) begin
+            // Cache hit: Update the statistics and return
+            hit = 1;
+            cache_stats.read_count++;
+            cache_stats.hit_count++;
+            // You can also update the LRU state here, depending on the cache's design
+            break;
+        end
+    end
+
+    if (!hit) begin
+        // Cache miss: Update the miss count and handle the miss (fetch from memory)
+        cache_stats.read_count++;
+        cache_stats.miss_count++;
+
+        integer replacement_index = get_lru_line_index(current_set.lru_state);
+        current_set.lines[replacement_index].valid = 1;
+        current_set.lines[replacement_index].tag = tag;
+        current_set.lines[replacement_index].mesi_state = EXCLUSIVE; // Initial state
+        current_set.lines[replacement_index].dirty = 0; // Assuming it's not dirty yet
+
+        // Update the LRU state as part of the replacement (if you are tracking LRU)
+        update_lru_on_access(current_set.lru_state, replacement_index);
+    end
+endtask
 
     /**process_write_request_data_cache();
      * @brief Processes a write request from the L1 data cache.
