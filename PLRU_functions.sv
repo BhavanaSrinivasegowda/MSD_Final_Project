@@ -50,7 +50,7 @@ Cache_t cache; // Instantiate cache
     // Function to find and evict a cache line using Pseudo LRU policy
    function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
     CacheSet_t cache_set;
-    int evict_index = 0;
+    int evict_index;
     int level;
 
     // Get the specified cache set
