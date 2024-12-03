@@ -262,8 +262,31 @@ module cache_simulator;
      * This function reads memory operations from the trace file and dispatches them
      * to the appropriate handlers.
      */
-    task process_trace_file(string filename);
-    endtask
+
+    // Instantiate the trace_file_reader module statically
+    trace_file_reader reader_instance();
+    // Task to process the trace file
+    task process_trace_file(input string filename);
+        begin
+            $display("Processing trace file: '%s'", filename);
+
+            // Call the read_and_parse_file task using the static instance
+            reader_instance.read_and_parse_file(filename);
+        end
+     endtask
+    // Example usage of the process_trace_file task
+    initial begin
+        string filename, input_name;
+        if ($value$plusargs("filename=%s", filename)) begin
+            input_name = filename;
+        end else begin
+            input_name = "//thoth.cecs.pdx.edu//Home05//bhavanas//Desktop//MSD_Checkpoint1//default.din";
+        end
+
+        // Call the process_trace_file task
+        process_trace_file(input_name);
+    end
+
 
     /**
      * @brief Main simulation control.
