@@ -255,9 +255,19 @@ module cache_simulator;
      * This function prints our snoop result if in NormalMode.
      */
     task PutSnoopResult(logic [ADDRESS_WIDTH-1:0] Address, int SnoopResult);
+        string result_str;
+
         begin
+            // Change snoop result to string for display
+            case (SnoopResult)
+                `NOHIT: result_str = "NOHIT";
+                `HIT:    result_str = "HIT";
+                `HITM:   result_str = "HITM";
+                default: result_str = "UNKNOWN";
+            endcase
+
             if (NormalMode) begin
-                $display("SnoopResult: Address %h, SnoopResult: %0d", Address, SnoopResult);
+                $display("SnoopResult: Address %h, SnoopResult: %s", Address, result_str);
             end
         end
     endtask
