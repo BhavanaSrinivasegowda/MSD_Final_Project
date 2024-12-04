@@ -1,0 +1,283 @@
+package cache_defs;;
+// Data sructure for cache and inialization functions
+
+    // Cache Parameters
+    parameter ADDRESS_WIDTH = 32;                ///< Width of the memory addresses
+    parameter CACHE_SIZE    = 16 * 1024 * 1024; ///< Total cache size in bytes (16MB)
+    parameter LINE_SIZE     = 64;                ///< Size of each cache line in bytes
+    parameter ASSOCIATIVITY = 16;                ///< Number of ways (16-way set associative)
+
+    // Derived Parameters
+    localparam NUM_LINES   = CACHE_SIZE / LINE_SIZE; ///< Total number of cache lines
+    localparam NUM_SETS    = NUM_LINES / ASSOCIATIVITY; ///< Number of sets in the cache
+    localparam OFFSET_BITS = $clog2(LINE_SIZE);         ///< Number of bits for offset within a cache line
+    localparam INDEX_BITS  = $clog2(NUM_SETS);          ///< Number of bits for cache set index
+    localparam TAG_BITS    = ADDRESS_WIDTH - INDEX_BITS - OFFSET_BITS; ///< Number of bits for tag
+
+    // MESI Protocol States
+    typedef enum logic [1:0] {
+        INVALID   = 2'b00, ///< Invalid state
+        SHARED    = 2'b01, ///< Shared state
+        EXCLUSIVE = 2'b10, ///< Exclusive state
+        MODIFIED  = 2'b11  ///< Modified state
+    } MESI_State_t;
+
+    // Cache Line Structure
+    typedef struct packed {
+    
+    logic                 valid;        // Valid bit 
+    logic [INDEX_BITS-1:0] index;       //Index bits
+    logic [OFFSET_BITS-1:0] offset;    //Offset bits
+    logic [TAG_BITS-1:0]  tag;          // Tag bits 
+    MESI_State_t          mesi_state;   // MESI state 
+    logic                 dirty;        // Dirty bit
+    // No LRU bits at line level, use pseudo-LRU at set level
+    } CacheLine_t;
+
+    // Cache Set Structure
+    typedef struct {
+        CacheLine_t lines [0:ASSOCIATIVITY-1];       ///< Array of cache lines in the set
+        logic [ASSOCIATIVITY-2:0] lru_state;         ///< Pseudo-LRU bits for replacement policy
+    } CacheSet_t;
+
+    // Cache Structure
+    typedef struct {
+        CacheSet_t sets [0:NUM_SETS-1];              ///< Array of cache sets
+    } Cache_t;
+
+    // Cache Statistics Structure
+    typedef struct {
+        integer read_count;    ///< Number of cache read operations
+        integer write_count;   ///< Number of cache write operations
+        integer hit_count;     ///< Number of cache hits
+        integer miss_count;    ///< Number of cache misses
+    } CacheStats_t;
+
+endpackage
+
+
+
+module cache_initializer;
+
+import cache_defs::*;
+
+cache_t cache;
+CacheStats_t stats;
+
+// Initial block to clear cache
+    initial begin
+        integer set_idx, line_idx;
+        for (set_idx = 0; set_idx < NUM_SETS; set_idx++) begin
+            for (line_idx = 0; line_idx < ASSOCIATIVITY; line_idx++) begin
+                cache.sets[set_idx].lines[line_idx].valid = 0;
+                cache.sets[set_idx].lines[line_idx].dirty = 0;
+            end
+        end
+        stats.read_count = 0;
+        stats.write_count = 0;
+        stats.hit_count = 0;
+        stats.miss_count = 0;
+    end
+
+endmodule
+
+
+
+
+
+module cache_simulator;
+
+import cache_defs::*;
+
+extern Cache_t cache;
+extern CacheStats_t stats;
+
+task process_read_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
+    tag = address[ADDRESS_WIDTH-1:ADDRESS_WIDTH-TAG_BITS];
+    index = address[OFFSET_BITS+TAG_BITS-1:OFFSET_BITS];
+    offset = address[OFFSET_BITS-1:0];
+
+    // Access the set corresponding to the index
+    CacheSet_t current_set = cache.sets[index];
+
+    // Initialize a flag to detect if the data was found (hit)
+    logic hit = 0;
+    integer i;
+
+    // Search for the tag in the set's lines (associative lookup)
+    for (i = 0; i < ASSOCIATIVITY; i++) begin
+        if (current_set.lines[i].valid && current_set.lines[i].tag == tag) begin
+            // Cache hit: Update the statistics and return
+            hit = 1;
+            cache_stats.read_count++;
+            cache_stats.hit_count++;
+            // Update the LRU state as part of the hit
+            update_lru_on_access(current_set.lru_state, i);
+            break;
+        end
+    end
+
+    if (!hit) begin
+        // Cache miss: Update the miss count
+        cache_stats.read_count++;
+        cache_stats.miss_count++;
+
+        // Check if the first 8 fields are full
+        integer filled_first_group = 0;
+        for (i = 0; i < ASSOCIATIVITY / 2; i++) begin
+            if (current_set.lines[i].valid) filled_first_group++;
+        end
+
+        integer replacement_index;
+        if (filled_first_group < ASSOCIATIVITY / 2) begin
+            // First group is not fully filled, find an empty line in the first group
+            for (i = 0; i < ASSOCIATIVITY / 2; i++) begin
+                if (!current_set.lines[i].valid) begin
+                    replacement_index = i;
+                    break;
+                end
+            end
+        end else begin
+            // First group is full, use the LRU policy within the first group for replacement
+            replacement_index = get_lru_line_index(current_set.lru_state[0:ASSOCIATIVITY/2-2]);
+        end
+
+        // Update the selected line
+        current_set.lines[replacement_index].valid = 1;
+        current_set.lines[replacement_index].tag = tag;
+        current_set.lines[replacement_index].mesi_state = EXCLUSIVE; // Initial state
+        current_set.lines[replacement_index].dirty = 0; // Assuming it's not dirty yet
+
+        // Update the LRU state for the accessed/replaced line
+        update_lru_on_access(current_set.lru_state, replacement_index);
+    end
+endtask
+
+task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
+    integer line_idx;
+
+    // Extract fields from the address
+    offset = address[OFFSET_BITS-1:0];
+    index  = address[OFFSET_BITS+INDEX_BITS-1:OFFSET_BITS];
+    tag    = address[ADDRESS_WIDTH-1:OFFSET_BITS+INDEX_BITS];
+
+    // Access the corresponding cache set
+    CacheSet_t current_set = cache.sets[index];
+    logic hit = 0;
+
+    // Search for the line in the cache set
+    for (line_idx = 0; line_idx < ASSOCIATIVITY; line_idx++) begin
+        if (current_set.lines[line_idx].valid && current_set.lines[line_idx].tag == tag) begin
+            // Cache hit
+            hit = 1;
+            current_set.lines[line_idx].dirty = 1; // Mark the line as dirty
+            // Update LRU state
+            update_lru_on_access(current_set.lru_state, line_idx);
+            break;
+        end
+    end
+
+    if (!hit) begin
+        // Cache miss: Select victim line
+        integer victim_line = get_lru_line_index(current_set.lru_state);
+        // Write back if the victim line is dirty
+        if (current_set.lines[victim_line].dirty) begin
+            write_back_to_memory(index, current_set.lines[victim_line]);
+        end
+        // Replace the line with new data
+        current_set.lines[victim_line].valid = 1;
+        current_set.lines[victim_line].tag = tag;
+        current_set.lines[victim_line].dirty = 1;
+        current_set.lines[victim_line].mesi_state = MODIFIED;
+        update_lru_on_access(current_set.lru_state, victim_line);
+    end
+endtask
+
+
+task process_read_request_instruction_cache(input logic [ADDRESS_WIDTH-1:0] address);
+    integer line_idx;
+
+    // Extract fields from the address
+    offset = address[OFFSET_BITS-1:0];
+    index  = address[OFFSET_BITS+INDEX_BITS-1:OFFSET_BITS];
+    tag    = address[ADDRESS_WIDTH-1:OFFSET_BITS+INDEX_BITS];
+
+    // Access the corresponding cache set
+    CacheSet_t current_set = cache.sets[index];
+    logic hit = 0;
+
+    // Search for the line in the cache set
+    for (line_idx = 0; line_idx < ASSOCIATIVITY; line_idx++) begin
+        if (current_set.lines[line_idx].valid && current_set.lines[line_idx].tag == tag) begin
+            // Cache hit
+            hit = 1;
+            // Update LRU state
+            update_lru_on_access(current_set.lru_state, line_idx);
+            break;
+        end
+    end
+
+    if (!hit) begin
+        // Cache miss: Select victim line
+        integer victim_line = get_lru_line_index(current_set.lru_state);
+        // Write back if the victim line is dirty (optional for instruction cache)
+        if (current_set.lines[victim_line].dirty) begin
+            write_back_to_memory(index, current_set.lines[victim_line]);
+        end
+        // Load the new line from memory
+        load_line_from_memory(index, tag, current_set.lines[victim_line]);
+        current_set.lines[victim_line].valid = 1;
+        current_set.lines[victim_line].tag = tag;
+        current_set.lines[victim_line].mesi_state = EXCLUSIVE;
+        update_lru_on_access(current_set.lru_state, victim_line);
+    end
+endtask
+
+
+function integer select_victim_line(input logic [INDEX_BITS-1:0] index);
+    // Access the current set
+    CacheSet_t current_set = cache.sets[index];
+
+    // Use LRU policy to select the victim line
+    return get_lru_line_index(current_set.lru_state);
+endfunction
+
+
+task write_back_to_memory(input logic [INDEX_BITS-1:0] index, input CacheLine_t line);
+    // Check if the line is valid and dirty
+    if (line.valid && line.dirty) begin
+        // Combine the tag, index, and offset to form the memory address
+        logic [ADDRESS_WIDTH-1:0] address;
+        address = {line.tag, index, {OFFSET_BITS{1'b0}}}; // Address points to the start of the line
+
+        // Simulate memory write-back
+        $display("Write-back to memory: Address = %h, Data = <line data here>", address);
+    end
+endtask
+
+
+task load_line_from_memory(input logic [INDEX_BITS-1:0] index, input logic [TAG_BITS-1:0] tag, output CacheLine_t line);
+    // Combine the tag, index, and offset to form the memory address
+    logic [ADDRESS_WIDTH-1:0] address;
+    address = {tag, index, {OFFSET_BITS{1'b0}}}; // Address points to the start of the line
+
+    // Simulate loading data from memory
+    $display("Loading line from memory: Address = %h", address);
+
+    // Populate the cache line
+    line.valid = 1;                   // Mark the line as valid
+    line.tag = tag;                   // Set the tag
+    line.dirty = 0;                   // Line is clean upon loading
+    line.mesi_state = EXCLUSIVE;      // Default MESI state for the new line
+endtask
+
+
+function integer get_lru_line_index(input logic [ASSOCIATIVITY-2:0] lru_state);
+    integer i;
+    for (i = 0; i < ASSOCIATIVITY; i++) begin
+        if (lru_state[i] == 0) begin
+            return i; // Select the least recently used line
+        end
+    end
+    return 0; // Default to the first line if no specific information is available
+endfunction
