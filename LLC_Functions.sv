@@ -211,11 +211,23 @@ task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address)
                    
               stats.miss_count ++;
               // call bus operation RWIM
-                bus_op_to_string(4);
                 Busoperation(`RWIM,address,`NOHIT);
-              current_set.lines[i].mesi_state = MODIFIED;
+                for (int j=0;j<ASSOCIATIVITY;j++)
+                 begin
+                     if (current_set.lines[j].MESI_State_t == INVALIDATE)begin
+                      logic empty_line = j;
+                         current_set.lines[j].MESI_State_t = MODIFIED;
+                         current_set.lines[j].tag = tag; 
+                         messageToCache(`SENDLINE,address);
+                    break;
+                   else begin
+                      logic [INDEX_BITS-1:0] z = select_victim_line(index);
+                       logic evicted_line = evict_line(z);
+                       current_set.lines[z].tag = tag; 
+                       messageToCache(`EVICTLINE,address);
+en
               // call bus operation sendline L1 
-                messageToCache(`SENDLINE,address);
+                
             end         ;
 endtask
 
