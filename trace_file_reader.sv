@@ -1,12 +1,12 @@
-module trace_file_reader;
+module trace_file_reader(output reg signed [31:0] n, reg signed [31:0] address);
     `define DEBUG_ENABLED
 
     // Task to read and parse a file given the file name or path
     task read_and_parse_file(input string file_name);
         integer file;
         string line;
-        reg signed [31:0] n;      // Signed integer for parsing
-        reg signed [31:0] address; // Address parsed from the file
+        //reg signed [31:0] n;      // Signed integer for parsing
+        //reg signed [31:0] address; // Address parsed from the file
 
         // Open the file with the given name or path
         file = $fopen(file_name, "r");
@@ -25,6 +25,7 @@ module trace_file_reader;
                 // Parse the values from the line
                 if ($sscanf(line, "%d %h", n, address) == 2) begin
                     $display("Parsed values: n:%d, address:%h", n, address);
+                    
                 end else begin
                     $display("Warning: Line format not as expected - '%s'", line);
                 end
