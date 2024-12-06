@@ -123,6 +123,7 @@ module cache_simulator;
      */
     task print_cache_contents();
         integer set_index, line_index;
+        real hit_ratio;
         begin
             $display("Valid Cache Lines:");
             for (set_index = 0; set_index < NUM_SETS; set_index = set_index + 1) begin
@@ -134,7 +135,20 @@ module cache_simulator;
                     end
                 end
             end
+           // Calculate hit ratio
+        if ((cache_reads + cache_writes) > 0) begin
+            hit_ratio = (cache_hits * 100.0) / (cache_reads + cache_writes);
+        end else begin
+            hit_ratio = 0.0;
         end
+        // Print cache statistics
+        $display("\nCache Statistics:");
+        $display("Number of cache reads: %0d", cache_reads);
+        $display("Number of cache writes: %0d", cache_writes);
+        $display("Number of cache hits: %0d", cache_hits);
+        $display("Number of cache misses: %0d", cache_misses);
+        $display("Cache hit ratio: %0.2f%%", hit_ratio);
+    end
     endtask
 
     // Function to extract tag, index, and offset
