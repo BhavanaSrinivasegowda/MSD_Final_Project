@@ -568,4 +568,66 @@ endfunction
     function read_request_from_L1_Instruction_cache(input logic [ADDRESS_WIDTH -1 :0] address);
         process_read_request_L1_DataCache(address);
     endfunction
+//Simulation Control and Trace File Processing
+    /**
+     * @brief Processes the trace file containing memory operations.
+     * @param filename The name of the trace file to process.
+     *
+     * This function reads memory operations from the trace file and dispatches them
+     * to the appropriate handlers.
+     */
+
+    // Instantiate the trace_file_reader module statically
+    trace_file_reader reader_instance();
+    // Task to process the trace file
+    task process_trace_file(input string filename);
+        begin
+            $display("Processing trace file: '%s'", filename);
+
+            // Call the read_and_parse_file task using the static instance
+            reader_instance.read_and_parse_file(filename);
+        end
+     endtask
+    // Example usage of the process_trace_file task
+    initial begin
+        string filename, input_name;
+        if ($value$plusargs("filename=%s", filename)) begin
+            input_name = filename;
+        end else begin
+            input_name = "//thoth.cecs.pdx.edu//Home05//bhavanas//Desktop//MSD_Checkpoint1//default.din";
+        end
+
+        // Call the process_trace_file task
+        process_trace_file(input_name);
+    end
+
+
+    /**
+     * @brief Main simulation control.
+     *
+     * This initial block coordinates the overall simulation, including initialization,
+     * processing the trace file, and printing final statistics.
+     */
+    initial begin
+        // Set simulation mode (can be set based on command-line arguments)
+        NormalMode = 1; // Set to normal mode; change to 0 for silent mode
+
+        // Initialize the cache
+        initialize_cache();
+
+        // Process the trace file
+        process_trace_file("trace.txt"); // Replace "trace.txt" with the actual trace file name
+
+        // Print final cache statistics
+        $display("Cache Statistics:");
+        $display("Number of cache reads: %0d", stats.read_count);
+        $display("Number of cache writes: %0d", stats.write_count);
+        $display("Number of cache hits: %0d", stats.hit_count);
+        $display("Number of cache misses: %0d", stats.miss_count);
+        $display("Cache hit ratio: %f", (stats.hit_count * 1.0) / (stats.read_count + stats.write_count));
+
+        $finish;
+    end
+
+endmodule
 
