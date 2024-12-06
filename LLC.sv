@@ -113,16 +113,8 @@ endfunction
 
 
 // Function to read from DRAM
-function logic [DATA_WIDTH-1:0] read_from_DRAM(input logic [ADDRESS_WIDTH-1:0] address);
-    logic [DATA_WIDTH-1:0] data;
-
-    // Simulate reading data from DRAM
-    // In a real implementation, this would involve accessing the memory.
-    // For simulation, we can just return some dummy data based on the address.
-    data = address[DATA_WIDTH-1:0]; // Example: Just use the lower bits of the address as data
-
-    $display("Reading from DRAM: Address = %h, Data = %h", address, data);
-    return data;
+function read_from_DRAM(input logic [ADDRESS_WIDTH-1:0] address);
+    $display("Reading from DRAM: Address = %h", address);
 endfunction
 
     // Evict a cache line using LRU policy
