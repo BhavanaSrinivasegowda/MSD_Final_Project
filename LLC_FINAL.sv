@@ -440,7 +440,7 @@ endfunction
     cache.sets[set_index] = cache_set;
 endtask
 
-   task process_read_request(input logic [ADDRESS_WIDTH-1:0] address);
+   task process_read_request_L1_DataCache(input logic [ADDRESS_WIDTH-1:0] address);
        logic [TAG_BITS-1:0] tag;
        logic [INDEX_BITS-1:0] index;
        integer line_index;
@@ -564,4 +564,8 @@ endfunction
                 current_set.lines[empty_line].MESI.State_t = INVALIDATE;
                 end
       endfunction
+
+    function read_request_from_L1_Instruction_cache(input logic [ADDRESS_WIDTH -1 :0] address);
+        process_read_request_L1_DataCache(address);
+    endfunction
 
