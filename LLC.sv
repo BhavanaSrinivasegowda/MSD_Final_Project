@@ -142,7 +142,7 @@ module cache_simulator;
 //--------------------------------------------------------------------------------------------------------------------------------------------------
   
 // findspace 
-function void find_space(index)
+function find_space(index)
 for (int i=0;i<ASSOCIATIVITY;i++)
 begin
 if (current_set.lines[i].MESI_State_t == INVALIDATE)begin
