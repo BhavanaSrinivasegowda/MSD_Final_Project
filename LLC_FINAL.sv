@@ -578,7 +578,9 @@ endfunction
      */
 
     // Instantiate the trace_file_reader module statically
-    trace_file_reader reader_instance();
+    trace_file_reader reader_instance(.n, .address);
+    logic [3:0] n;
+    logic [31:0] address;
     // Task to process the trace file
     task process_trace_file(input string filename);
         begin
@@ -611,6 +613,21 @@ endfunction
     initial begin
         // Set simulation mode (can be set based on command-line arguments)
         NormalMode = 1; // Set to normal mode; change to 0 for silent mode
+
+        always_comb begin
+            case(n) 
+                0: process_read_request_L1_DataCache(address);
+                1: process_write_request_data_cache(address);
+                2: process_read_request_L1_DataCache(address);
+                3: Snooped_read_request(address);
+                4: Snooped_write_request(address);
+                5: Snooped_RWIM_request(address);
+                6: 
+                7:
+                8:
+                9:
+            endcase
+       end
 
         // Initialize the cache
         initialize_cache();
