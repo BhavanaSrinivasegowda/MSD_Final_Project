@@ -477,26 +477,32 @@ endtask
 
            // Perform BusRd and snoop the bus
            int snoop_result;
-           BusOperation(`READ, address, snoop_result);
+        snoop_result = get_snoop_result_out(address);
 
            if (snoop_result == `HIT) begin
                // Get data from bus
-               get_snoop_result_out(address);
+               BusOperation(`READ, address, snoop_result);
+               if(current_set.lines.mesi_state != INVALIDATE) begin
                line_index = find_space();
+               end
                // Change state to SHARED
                current_set.lines[line_index].mesi_state = SHARED;
                MessageToCache(`SENDLINE, address);
            end else if (snoop_result == `HITM) begin
                // Get data from bus
-               get_snoop_result_out(address);
+               BusOperation(`READ, address, snoop_result);
+               if(current_set.lines.mesi_state != INVALIDATE) begin
                 line_index = find_space();
+               end
                // Change state to SHARED
                current_set.lines[line_index].mesi_state = SHARED;
                MessageToCache(`SENDLINE, address);
            end else if (snoop_result == `NOHIT) begin
                // Read from DRAM
                read_from_DRAM(address);
+               if(current_set.lines.mesi_state != INVALIDATE) begin
                line_index = find_space();
+               end
                // Change state to EXCLUSIVE
                current_set.lines[line_index].mesi_state = EXCLUSIVE;
                MessageToCache(`SENDLINE, address);
@@ -509,7 +515,7 @@ endtask
 function find_space(index)
 for (int i=0;i<ASSOCIATIVITY;i++)
 begin
-if (current_set.lines[i].MESI_State_t == INVALIDATE)begin
+    if (current_set.lines[i].mesi_state == INVALIDATE)begin
 logic empty_line = i;
 return empty_line;
 break;
@@ -577,8 +583,36 @@ endfunction
      * to the appropriate handlers.
      */
 
-    // Instantiate the trace_file_reader module statically
-    trace_file_reader reader_instance(.n, .address);
+    
+    /**
+     * @brief Main simulation control.
+     *
+     * This initial block coordinates the overall simulation, including initialization,
+     * processing the trace file, and printing final statistics.
+     */
+initial begin
+        // Set simulation mode (can be set based on command-line arguments)
+        NormalMode = 1; // Set to normal mode; change to 0 for silent mode
+
+        always_comb begin
+            case(n) 
+                0: process_read_request_L1_DataCache(address);
+                1: process_write_request_data_cache(address);
+                2: process_read_request_L1_DataCache(address);
+                3: Snooped_read_request(address);
+                4: Snooped_write_request(address);
+                5: Snooped_RWIM_request(address);
+                6: Snooped_invalidate_request(address);
+                7: clear_cache();
+                8: print_cache_contents();
+            endcase
+       end
+
+        // Initialize the cache
+        initialize_cache();
+
+//Read Trace File
+trace_file_reader reader_instance(.n, .address);
     logic [3:0] n;
     logic [31:0] address;
     // Task to process the trace file
@@ -602,38 +636,6 @@ endfunction
         // Call the process_trace_file task
         process_trace_file(input_name);
     end
-
-
-    /**
-     * @brief Main simulation control.
-     *
-     * This initial block coordinates the overall simulation, including initialization,
-     * processing the trace file, and printing final statistics.
-     */
-    initial begin
-        // Set simulation mode (can be set based on command-line arguments)
-        NormalMode = 1; // Set to normal mode; change to 0 for silent mode
-
-        always_comb begin
-            case(n) 
-                0: process_read_request_L1_DataCache(address);
-                1: process_write_request_data_cache(address);
-                2: process_read_request_L1_DataCache(address);
-                3: Snooped_read_request(address);
-                4: Snooped_write_request(address);
-                5: Snooped_RWIM_request(address);
-                6: 
-                7:
-                8:
-                9:
-            endcase
-       end
-
-        // Initialize the cache
-        initialize_cache();
-
-        // Process the trace file
-        process_trace_file("trace.txt"); // Replace "trace.txt" with the actual trace file name
 
         // Print final cache statistics
         $display("Cache Statistics:");
