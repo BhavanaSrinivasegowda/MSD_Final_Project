@@ -52,6 +52,8 @@ package cache_defs;;
         integer hit_count;     ///< Number of cache hits
         integer miss_count;    ///< Number of cache misses
     } CacheStats_t;
+cache_t cache;
+CacheStats_t stats;
 
 endpackage
 
@@ -61,8 +63,7 @@ module cache_initializer;
 
 import cache_defs::*;
 
-cache_t cache;
-CacheStats_t stats;
+
 
 // Initial block to clear cache
     initial begin
