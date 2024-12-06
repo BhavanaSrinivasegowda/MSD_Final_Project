@@ -168,8 +168,52 @@ endtask
      * This function handles write requests, checks for cache hits or misses,
      * updates the MESI state, and performs necessary bus operations if required.
      */
-    task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
-    endtask
+        // Code your design here
+import cache_defs::*;
+task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address)
+
+    tag = address[ADDRESS_WIDTH-1:ADDRESS_WIDTH-TAG_BITS];
+    index = address[OFFSET_BITS+TAG_BITS-1:OFFSET_BITS];
+    offset = address[OFFSET_BITS-1:0];
+  
+  stats.write_count ++;
+  
+  CacheSet_t current_set = cache.sets[index];
+  logic hit = 0;
+  integer i;
+
+    // Search for the tag in the set's lines (associative lookup)
+    for (i = 0; i < ASSOCIATIVITY; i++) begin
+      logic way = i;
+        if (current_set.lines[i].tag == tag) begin
+            // Cache hit: Update the statistics and return
+            hit = 1;
+            stats.hit_count ++;
+          case (current_set.lines[i].MESI_State_t)
+            SHARED: begin 
+              current_set.lines[i].mesi_state = MODIFIED;
+              update_lru_on_access(index,way);
+              // Call bus invalidate function.
+            end
+            MODIFIED : begin 
+               current_set.lines[i].mesi_state = MODIFIED;
+              update_lru_on_access(index, way);
+            end
+            EXCLUSIVE : begin
+              current_set.lines[i].mesi_state = MODIFIED;
+              update_lru_on_access(index, way);
+            end
+              endcase
+          return;        
+       end
+            else begin
+                   
+              stats.miss_count ++;
+              // call bus operation RWIM
+              current_set.lines[i].mesi_state = MODIFIED;
+              // call bus operation sendline L1              
+            end         
+endtask
 
     /**rocess_read_request_instruction_cache();
      * @brief Processes a read request from the L1 instruction cache.
