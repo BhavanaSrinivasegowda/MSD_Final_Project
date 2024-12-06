@@ -194,7 +194,7 @@ task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address)
               current_set.lines[i].mesi_state = MODIFIED;
               update_lru_on_access(index,way);
               // Call bus invalidate function.
-                bus_op_to_string(3);
+                Busoperation(`INVALIDATE,address,`HIT);
             end
             MODIFIED : begin 
                current_set.lines[i].mesi_state = MODIFIED;
@@ -212,9 +212,10 @@ task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address)
               stats.miss_count ++;
               // call bus operation RWIM
                 bus_op_to_string(4);
+                Busoperation(`RWIM,address,`NOHIT);
               current_set.lines[i].mesi_state = MODIFIED;
               // call bus operation sendline L1 
-                message_to_string(2);
+                messageToCache(`SENDLINE,address);
             end         ;
 endtask
 
