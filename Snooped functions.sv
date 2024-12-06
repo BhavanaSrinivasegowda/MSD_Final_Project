@@ -199,6 +199,18 @@ endfunction
             default:     bus_op_to_string = "UNKNOWN";
         endcase
     endfunction
+
+// Function to convert Message type to string
+function string message_to_string(input int Message);
+    case (Message)
+        `GETLINE:         message_to_string = "GETLINE";
+        `SENDLINE:        message_to_string = "SENDLINE";
+        `INVALIDATELINE:  message_to_string = "INVALIDATELINE";
+        `EVICTLINE:       message_to_string = "EVICTLINE";
+        default:           message_to_string = "UNKNOWN";
+    endcase
+endfunction
+
 // Bus Operations
     /**
      * @brief Task to simulate a bus operation and capture the snoop results of last level 
@@ -213,6 +225,21 @@ endfunction
                      bus_op_to_string(BusOp), Address, snoop_result_to_string(SnoopResult));
         end
     endtask
+/**
+ * @brief Task to simulate communication to the upper-level cache (e.g., L1).
+ *        It converts the message type to a string and prints the message along with the address.
+ * @param Message The type of message (GETLINE, SENDLINE, INVALIDATELINE, EVICTLINE)
+ * @param Address The memory address involved in the message
+ */
+task MessageToCache(
+    input int Message,
+    input logic [ADDRESS_WIDTH-1:0] Address
+);
+    if (NormalMode) begin
+        $display("L2: %s %h",
+                 message_to_string(Message), Address);
+    end
+endtask
 
 
 // Case 3: Snooped read request
@@ -264,4 +291,78 @@ task Snooped_write_request(input logic [ADDRESS_WIDTH-1:0] address);
 endtask
 
 // Case 5: snooped read with intent to modify request
-// Seacrh for the line in the cache, if it exixts in E,S state, invilidate it and send messgae
+// Seacrh for the line in the cache, if it exixts in E,S state, invilidate it and send messgae to L1
+// If it is in M state, do Bus write, and Getline and Invalidate to L1
+task Snooped_RWIM_request(input logic [ADDRESS_WIDTH-1:0] address);
+    logic [TAG_BITS-1:0] tag;
+    logic [INDEX_BITS-1:0] index;
+    logic [OFFSET_BITS-1:0] offset;
+    integer set_index, line_index;
+    begin
+        decode_address(address, tag, index, offset);
+        // Iterate over all cache lines in the set
+        for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
+            if (cache.sets[index].lines[line_index].tag == tag) begin
+                // Hit
+                IF (cache.sets[index].lines[line_index].mesi_state == `EXCLUSIVE) begin
+                    cache.sets[index].lines[line_index].mesi_state = `INVALID;
+                    messageToCache(`INVALIDATELINE, address);
+                    PutSnoopResult(address, `HIT);
+                end
+                ELSE IF (cache.sets[index].lines[line_index].mesi_state == `SHARED) begin
+                    cache.sets[index].lines[line_index].mesi_state = `INVALID;
+                    messageToCache(`INVALIDATELINE, address);
+                    PutSnoopResult(address, `HIT);
+                end
+                ELSE IF (cache.sets[index].lines[line_index].mesi_state == `MODIFIED) begin
+                    BusOperation(`WRITE, address, `RWIM);
+                    messageToCache(`GETLINE, address);
+                    messageToCache(`INVALIDATELINE, address);
+                    PutSnoopResult(address, `HITM);
+                end
+                ELSE begin
+                    PutSnoopResult(address,`NOHIT);
+                end
+            end
+        end
+    end
+endtask
+
+// Case 6: snooped invalidate request
+// Search for the line, if in E,S, Hit and invalidate it. Send message to L1
+// If in M, HITM and invalidate it, send message to L1
+task Snooped_invalidate_request(input logic [ADDRESS_WIDTH-1:0] address);
+    logic [TAG_BITS-1:0] tag;
+    logic [INDEX_BITS-1:0] index;
+    logic [OFFSET_BITS-1:0] offset;
+    integer set_index, line_index;
+    begin
+        decode_address(address, tag, index, offset);
+        // Iterate over all cache lines in the set
+        for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
+            if (cache.sets[index].lines[line_index].tag == tag) begin
+                // Hit
+                IF (cache.sets[index].lines[line_index].mesi_state == `EXCLUSIVE) begin
+                    cache.sets[index].lines[line_index].mesi_state = `INVALID;
+                    messageToCache(`INVALIDATELINE, address);
+                    PutSnoopResult(address, `HIT);
+                end
+                ELSE IF (cache.sets[index].lines[line_index].mesi_state == `SHARED) begin
+                    cache.sets[index].lines[line_index].mesi_state = `INVALID;
+                    messageToCache(`INVALIDATELINE, address);
+                    PutSnoopResult(address, `HIT);
+                end
+                ELSE IF (cache.sets[index].lines[line_index].mesi_state == `MODIFIED) begin
+                    cache.sets[index].lines[line_index].mesi_state = `INVALID;
+                    messageToCache(`INVALIDATELINE, address);
+                    PutSnoopResult(address, `HITM);
+                end
+                ELSE begin
+                    PutSnoopResult(address, `NOHIT);
+                end
+            end
+        end
+    end
+endtask
+
+    
