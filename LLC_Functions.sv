@@ -189,7 +189,7 @@ task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address)
             // Cache hit: Update the statistics and return
             hit = 1;
             stats.hit_count ++;
-          case (current_set.lines[i].MESI_State_t)
+            case (current_set.lines[i].mesi_state)
             SHARED: begin 
               current_set.lines[i].mesi_state = MODIFIED;
               update_lru_on_access(index,way);
@@ -214,9 +214,9 @@ task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address)
                 Busoperation(`RWIM,address,`NOHIT);
                 for (int j=0;j<ASSOCIATIVITY;j++)
                  begin
-                     if (current_set.lines[j].MESI_State_t == INVALIDATE)begin
+                     if (current_set.lines[j].mesi_state == INVALIDATE)begin
                       logic empty_line = j;
-                         current_set.lines[j].MESI_State_t = MODIFIED;
+                         current_set.lines[j].mesi_state = MODIFIED;
                          current_set.lines[j].tag = tag; 
                          messageToCache(`SENDLINE,address);
                     break;
@@ -225,7 +225,7 @@ task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address)
                        logic evicted_line = evict_line(z);
                        current_set.lines[z].tag = tag; 
                        messageToCache(`EVICTLINE,address);
-en
+                   end
               // call bus operation sendline L1 
                 
             end         ;
