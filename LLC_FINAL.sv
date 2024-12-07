@@ -452,7 +452,7 @@ task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
   
     // Search for the tag in the set's lines (associative lookup)
     for (line_index = 0; line_index < ASSOCIATIVITY; line_index++) begin
-    if (cache.sets[index].lines[line_index].tag == tag) begin
+        if (cache.sets[index].lines[line_index].tag == tag && cache.sets[index].lines[line_index].mesi_state != INVALID) begin
         // Cache hit: Update the statistics and return
         stats.write_count ++;
         stats.hit_count ++;
