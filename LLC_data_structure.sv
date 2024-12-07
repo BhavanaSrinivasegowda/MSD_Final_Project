@@ -84,3 +84,11 @@ module cache_simulator;
     Cache_t cache;      // The cache instance
     CacheStats_t stats; // Cache statistics
     int snoop_result;   // Snoop result for bus operations
+
+    initial begin
+        if (!$value$plusargs("mode=%d", NormalMode)) begin
+            // Default to normal mode if not specified
+            NormalMode = 1;
+        end
+        $display("Mode set to: %0d , 1 is NormalMode", NormalMode);
+    end

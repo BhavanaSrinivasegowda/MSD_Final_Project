@@ -274,19 +274,19 @@ task Snooped_read_request(input logic [ADDRESS_WIDTH-1:0] address);
         for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
             if (cache.sets[index].lines[line_index].tag == tag) begin
                 // Hit
-                IF (cache.sets[index].lines[line_index].mesi_state == `EXCLUSIVE) begin
+                if (cache.sets[index].lines[line_index].mesi_state == `EXCLUSIVE) begin
                     cache.sets[index].lines[line_index].mesi_state = `SHARED;
                     PutSnoopResult(address, `HIT);
                 end
-                ELSE IF (cache.sets[index].lines[line_index].mesi_state == `SHARED) begin
+                else if (cache.sets[index].lines[line_index].mesi_state == `SHARED) begin
                     PutSnoopResult(address, `HIT);
                 end
-                ELSE IF (cache.sets[index].lines[line_index].mesi_state == `MODIFIED) begin
+                else if (cache.sets[index].lines[line_index].mesi_state == `MODIFIED) begin
                     cache.sets[index].lines[line_index].mesi_state = `SHARED;
                     PutSnoopResult(address, `HITM);
                     BusOperation(`WRITE, address, `HITM);
                 end
-                ELSE begin
+                else begin
                     PutSnoopResult(address, `NOHIT);
                 end
             end
@@ -318,23 +318,23 @@ task Snooped_RWIM_request(input logic [ADDRESS_WIDTH-1:0] address);
         for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
             if (cache.sets[index].lines[line_index].tag == tag) begin
                 // Hit
-                IF (cache.sets[index].lines[line_index].mesi_state == `EXCLUSIVE) begin
+                if (cache.sets[index].lines[line_index].mesi_state == `EXCLUSIVE) begin
                     cache.sets[index].lines[line_index].mesi_state = `INVALID;
                     messageToCache(`INVALIDATELINE, address);
                     PutSnoopResult(address, `HIT);
                 end
-                ELSE IF (cache.sets[index].lines[line_index].mesi_state == `SHARED) begin
+                else if (cache.sets[index].lines[line_index].mesi_state == `SHARED) begin
                     cache.sets[index].lines[line_index].mesi_state = `INVALID;
                     messageToCache(`INVALIDATELINE, address);
                     PutSnoopResult(address, `HIT);
                 end
-                ELSE IF (cache.sets[index].lines[line_index].mesi_state == `MODIFIED) begin
+                else if (cache.sets[index].lines[line_index].mesi_state == `MODIFIED) begin
                     BusOperation(`WRITE, address, `RWIM);
                     messageToCache(`GETLINE, address);
                     messageToCache(`INVALIDATELINE, address);
                     PutSnoopResult(address, `HITM);
                 end
-                ELSE begin
+                else begin
                     PutSnoopResult(address,`NOHIT);
                 end
             end
@@ -356,22 +356,22 @@ task Snooped_invalidate_request(input logic [ADDRESS_WIDTH-1:0] address);
         for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
             if (cache.sets[index].lines[line_index].tag == tag) begin
                 // Hit
-                IF (cache.sets[index].lines[line_index].mesi_state == `EXCLUSIVE) begin
+                if (cache.sets[index].lines[line_index].mesi_state == `EXCLUSIVE) begin
                     cache.sets[index].lines[line_index].mesi_state = `INVALID;
                     messageToCache(`INVALIDATELINE, address);
                     PutSnoopResult(address, `HIT);
                 end
-                ELSE IF (cache.sets[index].lines[line_index].mesi_state == `SHARED) begin
+                else if (cache.sets[index].lines[line_index].mesi_state == `SHARED) begin
                     cache.sets[index].lines[line_index].mesi_state = `INVALID;
                     messageToCache(`INVALIDATELINE, address);
                     PutSnoopResult(address, `HIT);
                 end
-                ELSE IF (cache.sets[index].lines[line_index].mesi_state == `MODIFIED) begin
+                else if (cache.sets[index].lines[line_index].mesi_state == `MODIFIED) begin
                     cache.sets[index].lines[line_index].mesi_state = `INVALID;
                     messageToCache(`INVALIDATELINE, address);
                     PutSnoopResult(address, `HITM);
                 end
-                ELSE begin
+                else begin
                     PutSnoopResult(address, `NOHIT);
                 end
             end
