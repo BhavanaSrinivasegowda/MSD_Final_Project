@@ -32,9 +32,7 @@ module cache_simulator;
         MODIFIED  = 2'b11  // Modified state
     } MESI_State_t;
 
-     logic [INDEX_BITS-1:0] index;
-     logic [OFFSET_BITS-1:0] offset;
-
+    
     // Cache Line Structure
     typedef struct packed {
         logic [TAG_BITS-1:0]  tag;         // Tag bits of the address
@@ -84,9 +82,6 @@ module cache_simulator;
     logic NormalMode; // Simulation mode: 1 for normal mode, 0 for silent mode
 
     // Global Variables
-    CacheSet_t cache_set;
-    CacheSet_t current_set;
-    CacheLine_t line;   // Cache lines instance
     Cache_t cache;      // The cache instance
     CacheStats_t stats; // Cache statistics
     int snoop_result;   // Snoop result for bus operations
@@ -270,15 +265,15 @@ endtask
 //	IF HITM M ->S, Bus write,
 //	NoHit.
 task Snooped_read_request(input logic [ADDRESS_WIDTH-1:0] address);
-    logic [TAG_BITS-1:0] tag1;
-    logic [INDEX_BITS-1:0] index1;
-    logic [OFFSET_BITS-1:0] offset1;
+    logic [TAG_BITS-1:0] tag;
+    logic [INDEX_BITS-1:0] index;
+    logic [OFFSET_BITS-1:0] offset;
     integer set_index, line_index;
     
-        decode_address(address, tag1, index1, offset1);
+        decode_address(address, tag, index, offset);
         // Iterate over all cache lines in the set
         for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
-            if (cache.sets[index].lines[line_index].tag == tag1) begin
+            if (cache.sets[index].lines[line_index].tag == tag) begin
                 // Hit
                 if (cache.sets[index].lines[line_index].mesi_state == EXCLUSIVE) begin
                     cache.sets[index].lines[line_index].mesi_state = SHARED;
@@ -314,26 +309,26 @@ endtask
 // Seacrh for the line in the cache, if it exixts in E,S state, invilidate it and send messgae to L1
 // If it is in M state, do Bus write, and Getline and Invalidate to L1
 task Snooped_RWIM_request(input logic [ADDRESS_WIDTH-1:0] address);
-    logic [TAG_BITS-1:0] tag2;
-    logic [INDEX_BITS-1:0] index2;
-    logic [OFFSET_BITS-1:0] offset2;
-    integer set_index1, line_index1;
-    decode_address(address, tag2, index2, offset2);
+    logic [TAG_BITS-1:0] tag;
+    logic [INDEX_BITS-1:0] index;
+    logic [OFFSET_BITS-1:0] offset;
+    integer set_index, line_index;
+    decode_address(address, tag, index, offset);
         // Iterate over all cache lines in the set
-        for (line_index1 = 0; line_index1 < ASSOCIATIVITY; line_index1 = line_index1 + 1) begin
-            if (cache.sets[index].lines[line_index1].tag == tag2) begin
+        for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
+            if (cache.sets[index].lines[line_index].tag == tag) begin
                 // Hit
-                if (cache.sets[index].lines[line_index1].mesi_state == EXCLUSIVE) begin
-                    cache.sets[index].lines[line_index1].mesi_state = INVALID;
+                if (cache.sets[index].lines[line_index].mesi_state == EXCLUSIVE) begin
+                    cache.sets[index].lines[line_index].mesi_state = INVALID;
                     MessageToCache(`INVALIDATELINE, address);
                     PutSnoopResult(address, `HIT);
                 end
-                else if (cache.sets[index].lines[line_index1].mesi_state == SHARED) begin
-                    cache.sets[index].lines[line_index1].mesi_state = INVALID;
+                else if (cache.sets[index].lines[line_index].mesi_state == SHARED) begin
+                    cache.sets[index].lines[line_index].mesi_state = INVALID;
                     MessageToCache(`INVALIDATELINE, address);
                     PutSnoopResult(address, `HIT);
                 end
-                else if (cache.sets[index].lines[line_index1].mesi_state == MODIFIED) begin
+                else if (cache.sets[index].lines[line_index].mesi_state == MODIFIED) begin
                     BusOperation(`WRITE, address, `RWIM);
                     MessageToCache(`GETLINE, address);
                     MessageToCache(`INVALIDATELINE, address);
@@ -350,42 +345,43 @@ endtask
 // Search for the line, if in E,S, Hit and invalidate it. Send message to L1
 // If in M, HITM and invalidate it, send message to L1
 task Snooped_invalidate_request(input logic [ADDRESS_WIDTH-1:0] address);
-    logic [TAG_BITS-1:0] tag3;
-    logic [INDEX_BITS-1:0] index3;
-    logic [OFFSET_BITS-1:0] offset3;
-    integer set_index2, line_index2;
-        decode_address(address, tag3, index3, offset3);
+    logic [TAG_BITS-1:0] tag;
+    logic [INDEX_BITS-1:0] index;
+    logic [OFFSET_BITS-1:0] offset;
+    integer set_index, line_index;
+    begin
+        decode_address(address, tag, index, offset);
         // Iterate over all cache lines in the set
-        for (line_index2 = 0; line_index2 < ASSOCIATIVITY; line_index2 = line_index2 + 1) begin
-            if (cache.sets[index].lines[line_index2].tag == tag3) begin
+        for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
+            if (cache.sets[index].lines[line_index].tag == tag) begin
                 // Hit
-                if (cache.sets[index].lines[line_index2].mesi_state == EXCLUSIVE) begin
-                    cache.sets[index].lines[line_index2].mesi_state = INVALID;
+                if (cache.sets[index].lines[line_index].mesi_state == EXCLUSIVE) begin
+                    cache.sets[index].lines[line_index].mesi_state = INVALID;
                     MessageToCache(`INVALIDATELINE, address);
                     PutSnoopResult(address, `HIT);
                 end
-                else if (cache.sets[index].lines[line_index2].mesi_state == SHARED) begin
-                    cache.sets[index].lines[line_index2].mesi_state = INVALID;
+                else if (cache.sets[index].lines[line_index].mesi_state == SHARED) begin
+                    cache.sets[index].lines[line_index].mesi_state = INVALID;
                     MessageToCache(`INVALIDATELINE, address);
                     PutSnoopResult(address, `HIT);
                 end
-                else if (cache.sets[index].lines[line_index2].mesi_state == MODIFIED) begin
-                    cache.sets[index].lines[line_index2].mesi_state = INVALID;
+                else if (cache.sets[index].lines[line_index].mesi_state == MODIFIED) begin
+                    cache.sets[index].lines[line_index].mesi_state = INVALID;
                     MessageToCache(`INVALIDATELINE, address);
                     PutSnoopResult(address, `HITM);
-                end else begin
+                end
+                else begin
                     PutSnoopResult(address, `NOHIT);
                 end
             end
         end
+    end
 endtask
 
-function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
+function integer select_victim_line(input logic [INDEX_BITS-1:0] index);
     int evict_index;
     int level;
 
-    // Get the specified cache set
-    cache_set = cache.sets[set_index];
 
     // Traverse the pseudo LRU tree to find the line to evict
     for (level = 0; level < $clog2(ASSOCIATIVITY); level++) begin
@@ -396,7 +392,7 @@ function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
         end
 
         // Move left or right based on the current state of lru_state
-        if (cache_set.lru_state[evict_index] == 0) begin
+        if (cache.sets[index].lru_state[evict_index] == 0) begin
             evict_index = (evict_index << 1); // Go left
         end else begin
             evict_index = (evict_index << 1) | 1; // Go right
@@ -414,11 +410,12 @@ endfunction
 
 
     // Function to update the pseudo LRU bits after accessing a cache line
-    task update_lru_on_access(input logic [INDEX_BITS-1:0] set_index3, input integer accessed_index);
+task update_lru_on_access(input logic [INDEX_BITS-1:0] set_index, input integer accessed_index);
+    CacheSet_t cache_set;
     int i;
 
     // Get the specified cache set
-    cache_set = cache.sets[set_index3];
+    cache_set = cache.sets[set_index];
 
     // Update the pseudo LRU bits
     // Reset all bits
@@ -436,7 +433,7 @@ endfunction
     end
 
     // Update the cache set's LRU state
-    cache.sets[set_index3] = cache_set;
+    cache.sets[set_index] = cache_set;
 endtask
 
 task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
@@ -445,33 +442,34 @@ task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
     int i;
     logic evicted_line;
     logic [INDEX_BITS-1:0] z;
+    logic [TAG_BITS-1:0] tag;
+    logic [INDEX_BITS-1:0] index;
+    logic [OFFSET_BITS-1:0] offset;
+    integer set_index, line_index;
    
     // Decode address into tag, index, and offset
-    decode_address(address, line.tag, index, offset);
+    decode_address(address, tag, index, offset);
   
-    // Assign current_set to the appropriate set
-    current_set = cache.sets[index];
-
     // Search for the tag in the set's lines (associative lookup)
-    for (i = 0; i < ASSOCIATIVITY; i++) begin
-    if (current_set.lines[i].tag == line.tag) begin
+    for (line_index = 0; line_index < ASSOCIATIVITY; line_index++) begin
+    if (cache.sets[index].lines[line_index].tag == tag) begin
         // Cache hit: Update the statistics and return
         stats.write_count ++;
         stats.hit_count ++;
-        case (current_set.lines[i].mesi_state)
+        case (cache.sets[index].lines[line_index].mesi_state)
             SHARED: begin 
-                current_set.lines[i].mesi_state = MODIFIED;
-                update_lru_on_access(index, i);
+                cache.sets[index].lines[line_index].mesi_state =  MODIFIED;
+                update_lru_on_access(index, line_index);
                 // Call bus invalidate function.
                 BusOperation(`INVALIDATE,address,`HIT);
             end
             MODIFIED : begin 
-                current_set.lines[i].mesi_state = MODIFIED;
-                update_lru_on_access(index, i);
+                cache.sets[index].lines[line_index].mesi_state =  MODIFIED;
+                update_lru_on_access(index, line_index);
             end
             EXCLUSIVE : begin
-                current_set.lines[i].mesi_state = MODIFIED;
-                update_lru_on_access(index, i);
+                cache.sets[index].lines[line_index].mesi_state = MODIFIED;
+                update_lru_on_access(index, line_index);
             end
         endcase        
     end else begin // hitmiss
@@ -479,16 +477,15 @@ task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
         stats.miss_count ++;
         // call bus operation RWIM
         BusOperation(`RWIM,address,`NOHIT);
-        if (current_set.lines[i].mesi_state == INVALID) begin
-            empty_line = i;
-            current_set.lines[i].mesi_state = MODIFIED;
-            current_set.lines[i].tag = line.tag; 
+        if (cache.sets[index].lines[line_index].mesi_state == INVALID) begin
+            empty_line = line_index;
+            cache.sets[index].lines[line_index].mesi_state = MODIFIED;
+            tag = cache.sets[index].lines[line_index].tag;
             MessageToCache(`SENDLINE,address);
-            break;
         end else begin
             z = select_victim_line(index);
-            evicted_line = evict_line(z);
-            current_set.lines[z].tag = line.tag; 
+            evict_line(index, z);
+            tag = cache.sets[index].lines[line_index].tag; 
             MessageToCache(`EVICTLINE,address);
         end
         // call bus operation sendline L1    
@@ -496,27 +493,27 @@ task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
 end // Closing the for loop         
 endtask
 
+
 task process_read_request_L1_DataCache(input logic [ADDRESS_WIDTH-1:0] address);
-       logic [TAG_BITS-1:0] tag4; 
-       int snoop_result;   
-       integer line_index3;
-// Decode address into tag, index, and offset
-    decode_address(address, line.tag, index, offset);
+       logic [TAG_BITS-1:0] tag;   
+       logic [INDEX_BITS-1:0] index;
+       logic [OFFSET_BITS-1:0] offset; 
+       integer line_index;
+       integer snoop_result;
+
+    decode_address(address, tag, index, offset);
   
-    // Assign current_set to the appropriate set
-    current_set = cache.sets[index];
-
-
+  
        // Search for the tag in the set's lines
-       for (line_index3 = 0; line_index3 < ASSOCIATIVITY; line_index3++) begin
-           if (current_set.lines[line_index3].mesi_state != INVALID && 
-               current_set.lines[line_index3].tag == tag4) begin
+       for (line_index = 0; line_index < ASSOCIATIVITY; line_index++) begin
+           if (cache.sets[index].lines[line_index].mesi_state != INVALID && 
+               cache.sets[index].lines[line_index].tag == tag) begin
                // Cache hit
                stats.read_count++;
                stats.hit_count++;
                // MESI state remains the same
                //update PLRU
-                update_lru_on_access(current_set.lru_state, line_index3);
+                update_lru_on_access(index, line_index);
                break;
            end else begin
            // Cache miss
@@ -529,29 +526,30 @@ task process_read_request_L1_DataCache(input logic [ADDRESS_WIDTH-1:0] address);
            if (snoop_result == `HIT) begin
                // Get data from bus
                BusOperation(`READ, address, snoop_result);
-               if(cache.sets[index].lines[line_index3].mesi_state  != INVALID) begin
-               line_index3 = find_space(index);
+               if(cache.sets[index].lines[line_index].mesi_state  != INVALID) begin
+               line_index = find_space(index);
                end
                // Change state to SHARED
-               cache.sets[index].lines[line_index3].mesi_state  = SHARED;
+               cache.sets[index].lines[line_index].mesi_state  = SHARED;
                MessageToCache(`SENDLINE, address);
            end else if (snoop_result == `HITM) begin
                // Get data from bus
                BusOperation(`READ, address, snoop_result);
-               if(cache.sets[index].lines[line_index3].mesi_state  != INVALID) begin
-                line_index3 = find_space(index);
+               if(cache.sets[index].lines[line_index].mesi_state  != INVALID) begin
+                line_index = find_space(index);
                end
                // Change state to SHARED
-               cache.sets[index].lines[line_index3].mesi_state  = SHARED;
+               cache.sets[index].lines[line_index].mesi_state  = SHARED;
                MessageToCache(`SENDLINE, address);
            end else if (snoop_result == `NOHIT) begin
                // Read from DRAM
-               read_from_DRAM(address);
-               if(cache.sets[index].lines[line_index3].mesi_state != INVALID) begin
-               line_index3 = find_space(index);
+               BusOperation(`READ, address, `NOHIT);
+               if(cache.sets[index].lines[line_index].mesi_state != INVALID) begin
+               line_index = find_space(index);
                end
                // Change state to EXCLUSIVE
-               cache.sets[index].lines[line_index3].mesi_state = EXCLUSIVE;
+               cache.sets[index].lines[line_index].mesi_state = EXCLUSIVE;
+               tag = cache.sets[index].lines[line_index].tag;
                MessageToCache(`SENDLINE, address);
            end
        end
@@ -560,34 +558,24 @@ endtask
 //--------------------------------------------------------------------------------------------------------------------------------------------------
   
 // findspace 
-function find_space(index);
-int i;
+function find_space(logic [INDEX_BITS-1:0] index);   
+int line_index;
 logic empty_line;
 logic evicted_line;
 logic [INDEX_BITS-1:0] z;
-for (int i=0;i<ASSOCIATIVITY;i++) begin
-    if (current_set.lines[i].mesi_state == INVALID)begin
-     empty_line = i;
+
+for (int line_index=0; line_index<ASSOCIATIVITY; line_index++) begin
+    if (cache.sets[index].lines[line_index].mesi_state == INVALID)begin
+     empty_line = line_index;
      return empty_line;
     end else begin
      z = select_victim_line(index);
-     evicted_line = evict_line(z);
+     evicted_line = evict_line(index, z);
      return evicted_line;
      end
  end
 endfunction 
 
-function void write_back_to_memory(input logic [INDEX_BITS-1:0] index);
-    // Check if the line is modified
-    if (current_set.lines[index].mesi_state == MODIFIED ) begin
-        // Combine the tag, index, and offset to form the memory address
-        logic [ADDRESS_WIDTH-1:0] address;
-        address = {line.tag, index, {OFFSET_BITS{1'b0}}}; // Address points to the start of the line
-
-        // Simulate memory write-back
-        $display("Write-back to memory: Address = %h, Data = <line data here>", address);
-    end
-endfunction
 
   // Function to return data to L1
 function void return_data_to_L1(input logic [ADDRESS_WIDTH-1:0] address);
@@ -597,17 +585,13 @@ function void return_data_to_L1(input logic [ADDRESS_WIDTH-1:0] address);
 endfunction
 
 
-// Function to read from DRAM
-function void read_from_DRAM(input logic [ADDRESS_WIDTH-1:0] address);
-    $display("Reading from DRAM: Address = %h", address);
-endfunction
-
     // Evict a cache line using LRU policy
-function integer evict_line(input logic [INDEX_BITS-1:0] index); 
-    if (current_set.lines[index].mesi_state == MODIFIED) begin
+function evict_line(input logic [INDEX_BITS-1:0] index, int line_index); 
+logic [ADDRESS_WIDTH-1:0] address;
+    if (cache.sets[index].lines[line_index].mesi_state == MODIFIED) begin
     //write to DRAM function 
-    write_back_to_memory(index);
-    current_set.lines[index].mesi_state = INVALID;
+    BusOperation(`WRITE, address, `NOHIT);
+    cache.sets[index].lines[line_index].mesi_state = INVALID;
     end
 endfunction
 
@@ -635,10 +619,11 @@ endtask
 
         // Set simulation mode (can be set based on command-line arguments)
        //  NormalMode = 1; // Set to normal mode; change to 0 for silent mode
+       
 
 //Read Trace File
 logic [3:0] n;
-logic [31:0] address;
+logic [ADDRESS_WIDTH-1:0] address;
 string filename;
 string input_name;
 
@@ -647,8 +632,7 @@ trace_file_reader reader_instance (.n(n), .address(address));
 initial begin
 if ($value$plusargs("filename=%s",filename))begin
 input_name = filename;
-end
-else begin
+end else begin
 input_name = "//thoth.cecs.pdx.edu//Home05//bhavanas//Desktop//MSD_Checkpoint1//default.din";
 end
    
@@ -662,20 +646,7 @@ end
     end */
 
     reader_instance.read_and_parse_file(input_name);  // Pass the variable name
-
-
-            case(n) 
-                0: process_read_request_L1_DataCache(address);
-                1: process_write_request_data_cache(address);
-                2: read_request_from_L1_Instruction_cache(address);
-                3: Snooped_read_request(address);
-                4: Snooped_write_request(address);
-                5: Snooped_RWIM_request(address);
-                6: Snooped_invalidate_request(address);
-                8: clear_cache();
-                9: print_cache_contents();
-            endcase
-
-print_cache_contents();
+     
+     print_cache_contents();
 end
 endmodule
