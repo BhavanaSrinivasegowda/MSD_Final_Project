@@ -1,3 +1,4 @@
+
 /**
  * @file cache_simulator.sv
  * @brief Cache Simulator for ECE 485/585 Final Project
@@ -9,7 +10,7 @@
  * The cache is 16MB, 16-way set associative, with 64-byte lines.
  */
 
-module cache_simulator;
+module cache_simulator1;
 
     // Cache Parameters
     parameter ADDRESS_WIDTH = 32;                // Width of the memory addresses
@@ -491,9 +492,9 @@ task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
         BusOperation(`RWIM, address, snoop_result);
 
         // Find a replacement line
-        line_index = find_space(index);
+        line_index = find_space(index,address);
         // Update the cache line
-        cache.sets[index].lines[line_index].tag        = tag;
+        cache.sets[index].lines[line_index].tag = tag;
         cache.sets[index].lines[line_index].mesi_state = MODIFIED;
 
         // Update the LRU state
@@ -503,6 +504,7 @@ task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
         MessageToCache(`SENDLINE, address);
     end
 endtask
+
 
 
 task process_read_request_L1_DataCache(input logic [ADDRESS_WIDTH-1:0] address);
@@ -546,7 +548,7 @@ task process_read_request_L1_DataCache(input logic [ADDRESS_WIDTH-1:0] address);
             // Bus read operation
             BusOperation(`READ, address, snoop_result);
             // Find a replacement line
-            line_index = find_space(index);
+            line_index = find_space(index,address);
             // Update the cache line
             cache.sets[index].lines[line_index].tag = tag;
             cache.sets[index].lines[line_index].mesi_state  = SHARED;
@@ -555,7 +557,7 @@ task process_read_request_L1_DataCache(input logic [ADDRESS_WIDTH-1:0] address);
         end else if (snoop_result == `NOHIT) begin
             // Bus read operation
             BusOperation(`READ, address, `NOHIT);
-            line_index = find_space(index);
+            line_index = find_space(index,address);
             // Update the cache line
             cache.sets[index].lines[line_index].tag = tag;
             cache.sets[index].lines[line_index].mesi_state = EXCLUSIVE;
@@ -569,7 +571,7 @@ endtask
 //--------------------------------------------------------------------------------------------------------------------------------------------------
   
 // findspace 
-function find_space(logic [INDEX_BITS-1:0] index);   
+function find_space(logic [INDEX_BITS-1:0] index, logic [ADDRESS_WIDTH-1:0] address);   
 int line_index;
 logic empty_line;
 logic evicted_line;
@@ -579,12 +581,12 @@ for (int line_index=0; line_index<ASSOCIATIVITY; line_index++) begin
     if (cache.sets[index].lines[line_index].mesi_state == INVALID)begin
      empty_line = line_index;
      return empty_line;
-    end else begin
+    end
+end
+    
      z = select_victim_line(index);
-     evicted_line = evict_line(index, z);
-     return evicted_line;
-     end
- end
+     evict_line(index, z, address);
+     return z;
 endfunction 
 
 
@@ -597,8 +599,7 @@ endfunction
 
 
     // Evict a cache line using LRU policy
-function evict_line(input logic [INDEX_BITS-1:0] index, int line_index); 
-logic [ADDRESS_WIDTH-1:0] address;
+function evict_line(input logic [INDEX_BITS-1:0] index, int line_index, logic [ADDRESS_WIDTH-1:0] address); 
     if (cache.sets[index].lines[line_index].mesi_state == MODIFIED) begin
     //write to DRAM function 
     BusOperation(`WRITE, address, `NOHIT);
