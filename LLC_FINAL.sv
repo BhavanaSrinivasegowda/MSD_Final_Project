@@ -170,9 +170,9 @@ module cache_simulator;
 function int get_snoop_result_out(input logic [ADDRESS_WIDTH-1:0] address);
 int get_snoop_result;
     case (address[1:0])
-        2'b00: get_snoop_result = `HIT;   // ---00 = HIT
-        2'b01: get_snoop_result = `HITM;  // ---01 = HITM
-        default: get_snoop_result = `NOHIT; // ---10 or ---11 = NOHIT
+        2'b00: get_snoop_result_out = `HIT;   // ---00 = HIT
+        2'b01: get_snoop_result_out = `HITM;  // ---01 = HITM
+        default: get_snoop_result_out = `NOHIT; // ---10 or ---11 = NOHIT
     endcase
 endfunction
 
@@ -495,65 +495,65 @@ endtask
 
 
 task process_read_request_L1_DataCache(input logic [ADDRESS_WIDTH-1:0] address);
-       logic [TAG_BITS-1:0] tag;   
-       logic [INDEX_BITS-1:0] index;
-       logic [OFFSET_BITS-1:0] offset; 
-       integer line_index;
-       integer snoop_result;
-
+    // Variable declarations
+    logic [TAG_BITS-1:0] tag;
+    logic [INDEX_BITS-1:0] index;
+    logic [OFFSET_BITS-1:0] offset;
+    integer line_index;
+    logic hit;
+    integer snoop_result;
+    integer replacement_line;
+    
+    // decode the address
     decode_address(address, tag, index, offset);
-  
-  
-       // Search for the tag in the set's lines
-       for (line_index = 0; line_index < ASSOCIATIVITY; line_index++) begin
-           if (cache.sets[index].lines[line_index].mesi_state != INVALID && 
-               cache.sets[index].lines[line_index].tag == tag) begin
-               // Cache hit
-               stats.read_count++;
-               stats.hit_count++;
-               // MESI state remains the same
-               //update PLRU
-                update_lru_on_access(index, line_index);
-               break;
-           end else begin
-           // Cache miss
-           stats.read_count++;
-           stats.miss_count++;
+    
+    // Update the read count
+    stats.read_count++;
+    hit = 0; // Cache hit flag
 
-           // Perform BusRd and snoop the bus
-           snoop_result = get_snoop_result_out(address);
+    // Search for the tag in the set
+    for (line_index = 0; line_index < ASSOCIATIVITY; line_index++) begin
+        if (cache.sets[index].lines[line_index].mesi_state != INVALID && 
+            cache.sets[index].lines[line_index].tag == tag) begin
+            // Cache hit
+            hit = 1;
+            stats.hit_count++;
+            // Update the LRU state
+            update_lru_on_access(index, line_index);
+            break; // Exit the loop
+        end
+    end
 
-           if (snoop_result == `HIT) begin
-               // Get data from bus
-               BusOperation(`READ, address, snoop_result);
-               if(cache.sets[index].lines[line_index].mesi_state  != INVALID) begin
-               line_index = find_space(index);
-               end
-               // Change state to SHARED
-               cache.sets[index].lines[line_index].mesi_state  = SHARED;
-               MessageToCache(`SENDLINE, address);
-           end else if (snoop_result == `HITM) begin
-               // Get data from bus
-               BusOperation(`READ, address, snoop_result);
-               if(cache.sets[index].lines[line_index].mesi_state  != INVALID) begin
-                line_index = find_space(index);
-               end
-               // Change state to SHARED
-               cache.sets[index].lines[line_index].mesi_state  = SHARED;
-               MessageToCache(`SENDLINE, address);
-           end else if (snoop_result == `NOHIT) begin
-               // Read from DRAM
-               BusOperation(`READ, address, `NOHIT);
-               if(cache.sets[index].lines[line_index].mesi_state != INVALID) begin
-               line_index = find_space(index);
-               end
-               // Change state to EXCLUSIVE
-               cache.sets[index].lines[line_index].mesi_state = EXCLUSIVE;
-               tag = cache.sets[index].lines[line_index].tag;
-               MessageToCache(`SENDLINE, address);
-           end
-       end
-end
+    if (!hit) begin
+        // Cache miss
+        stats.miss_count++;
+
+        // Check if the cache line is dirty
+        snoop_result = get_snoop_result_out(address);
+
+        if (snoop_result == `HIT || snoop_result == `HITM) begin
+            // Bus read operation
+            BusOperation(`READ, address, snoop_result);
+            // Find a replacement line
+            line_index = find_space(index);
+            // Update the cache line
+            cache.sets[index].lines[line_index].tag = tag;
+            cache.sets[index].lines[line_index].mesi_state  = SHARED;
+            // Send message to the cache
+            MessageToCache(`SENDLINE, address);
+        end else if (snoop_result == `NOHIT) begin
+            // Bus read operation
+            BusOperation(`READ, address, `NOHIT);
+            line_index = find_space(index);
+            // Update the cache line
+            cache.sets[index].lines[line_index].tag = tag;
+            cache.sets[index].lines[line_index].mesi_state = EXCLUSIVE;
+            // Send message to the cache
+            MessageToCache(`SENDLINE, address);
+        end
+        // Update the LRU state
+        update_lru_on_access(index, line_index);
+    end
 endtask
 //--------------------------------------------------------------------------------------------------------------------------------------------------
   
@@ -630,6 +630,10 @@ string input_name;
 trace_file_reader reader_instance (.n(n), .address(address));
 
 initial begin
+if (!$value$plusargs("mode=%d", NormalMode)) begin
+            // Default to normal mode if not specified
+            NormalMode = 1;
+        end
 if ($value$plusargs("filename=%s",filename))begin
 input_name = filename;
 end else begin
