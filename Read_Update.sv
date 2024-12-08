@@ -62,7 +62,7 @@ endtask
 
 
 
-task process_read_request_L1_DataCache(input logic [ADDRESS_WIDTH-1:0] address);
+task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
     // Variable declarations
     logic [TAG_BITS-1:0] tag;
     logic [INDEX_BITS-1:0] index;
