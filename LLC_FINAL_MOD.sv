@@ -404,6 +404,10 @@ function integer select_victim_line(input logic [INDEX_BITS-1:0] index);
     if (evict_index >= ASSOCIATIVITY) begin
         return -1; // Indicate an error
     end
+    else begin
+     $display("Evicted way %0d", evict_index);
+
+    end
 
     // Return the index of the cache line to evict
     return evict_index;
@@ -571,13 +575,11 @@ endtask
 //--------------------------------------------------------------------------------------------------------------------------------------------------
   
 // findspace 
-function find_space(logic [INDEX_BITS-1:0] index, logic [ADDRESS_WIDTH-1:0] address);   
-int line_index;
-logic empty_line;
-logic evicted_line;
-logic [INDEX_BITS-1:0] z;
+function int find_space(logic [INDEX_BITS-1:0] index, logic [ADDRESS_WIDTH-1:0] address);   
+int empty_line;
+int z;
 
-for (int line_index=0; line_index<ASSOCIATIVITY; line_index++) begin
+for (int line_index = 0; line_index < ASSOCIATIVITY; line_index++) begin
     if (cache.sets[index].lines[line_index].mesi_state == INVALID)begin
      empty_line = line_index;
      return empty_line;
