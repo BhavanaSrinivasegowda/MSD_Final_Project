@@ -418,6 +418,7 @@ function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
             end
         end
         select_victim_line = node_index;
+        $display("Selected victim line: %0d", select_victim_line);
     end
 endfunction
 
@@ -617,6 +618,10 @@ function evict_line(input logic [INDEX_BITS-1:0] index, int line_index, logic [A
     //write to DRAM function 
     BusOperation(`WRITE, address, `NOHIT);
     cache.sets[index].lines[line_index].mesi_state = INVALID;
+    $display("%h is evicted from the cache", address);
+    messageToCache(`EVICTLINE, address);
+    end
+    else begin
     end
 endfunction
 
