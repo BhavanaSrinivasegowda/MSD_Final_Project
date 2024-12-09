@@ -113,10 +113,21 @@ module cache_simulator1;
 
     /**
      * @brief Clears the cache and resets all state.
+     // Without resetting the statistics
      */
     task clear_cache();
+        integer set_index, line_index;
         begin
-            initialize_cache();
+            // Iterate over all cache sets
+            for (set_index = 0; set_index < NUM_SETS; set_index = set_index + 1) begin
+                // Initialize pseudo-LRU bits for the set
+                cache.sets[set_index].lru_state = '0;
+                // Iterate over all cache lines in the set
+                for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
+                    cache.sets[set_index].lines[line_index].tag        = '0;
+                    cache.sets[set_index].lines[line_index].mesi_state = INVALID;
+                end
+            end
         end
     endtask
 
@@ -379,61 +390,66 @@ task Snooped_invalidate_request(input logic [ADDRESS_WIDTH-1:0] address);
     end
 endtask
 
-function integer select_victim_line(input logic [INDEX_BITS-1:0] index);
-    int evict_index = 0;
-    int level;
+function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
+    integer node_index;
+    integer level;
+    integer bit;
+    integer bit_length;
+    begin
+        accessed_index = cache.sets[set_index].lru_state; // Get the LRU state of the set
+        node_index = 0; // Start at the root of the tree
+        bit_length = $clog2(ASSOCIATIVITY); // Number of bits in the pseudo LRU tree, 4 bits for 16-way
 
+        // Traverse the pseudo LRU tree to update the LRU bits
+        for (level = 0; level < bit_length; level++) begin
+            // Determine the bit to access based on the level
+            bit = (accessed_index >> (bit_length - 1 - level)) & 1;
 
-    // Traverse the pseudo LRU tree to find the line to evict
-    for (level = 0; level < $clog2(ASSOCIATIVITY); level++) begi
-
-        // Move left or right based on the current state of lru_state
-        if (cache.sets[index].lru_state[evict_index] == 0) begin
-            evict_index = (evict_index << 1) | 1; // Go left
-        end else begin
-            evict_index = (evict_index << 1); // Go right
+            if (bit == 1) begin
+                // Update the LRU bit to 0
+                cache.sets[set_index].lru_state[node_index] = 0;
+                // Move to the left child
+                node_index = 2 * node_index + 1;
+            end else begin
+                // Update the LRU bit to 1
+                cache.sets[set_index].lru_state[node_index] = 1;
+                // Move to the right child
+                node_index = 2 * node_index + 2;
+            end
         end
+        select_victim_line = node_index;
     end
-
-    // Ensure evict_index is within valid range
-    if (evict_index >= ASSOCIATIVITY) begin
-        return -1; // Indicate an error
-    end
-    else begin
-     $display("Evicted way %0d", evict_index);
-
-    end
-
-    // Return the index of the cache line to evict
-    return evict_index;
 endfunction
 
 
     // Function to update the pseudo LRU bits after accessing a cache line
 task update_lru_on_access(input logic [INDEX_BITS-1:0] set_index, input integer accessed_index);
-    CacheSet_t cache_set;
-    int i;
+    integer node_index;
+    integer level;
+    integer bit;
+    integer bit_length;
+    begin
+        node_index = 0; // Start at the root of the tree
+        bit_length = $clog2(ASSOCIATIVITY); // Number of bits in the pseudo LRU tree, 4 bits for 16-way
 
-    // Get the specified cache set
-    cache_set = cache.sets[set_index];
+        // Traverse the pseudo LRU tree to update the LRU bits
+        for (level = 0; level < bit_length; level++) begin
+            // Determine the bit to access based on the level
+            bit = (accessed_index >> (bit_length - 1 - level)) & 1;
 
-    // Update the pseudo LRU bits
-    // Reset all bits
-    for (i = 0; i < ASSOCIATIVITY - 1; i++) begin
-        cache_set.lru_state[i] = 0; // Reset all bits first
-    end
-
-    // Set the accessed line as most recently used
-    for (i = 0; i < $clog2(ASSOCIATIVITY); i++) begin
-        if (accessed_index & (1 << i)) begin
-            cache_set.lru_state[(1 << i) - 1] = 1; // Mark the path to the accessed line
-        end else begin
-            cache_set.lru_state[(1 << i) - 1] = 0; // Reset paths not leading to accessed line
+            if (bit == 0) begin
+                // Update the LRU bit to 0
+                cache.sets[set_index].lru_state[node_index] = 0;
+                // Move to the left child
+                node_index = 2 * node_index + 1;
+            end else begin
+                // Update the LRU bit to 1
+                cache.sets[set_index].lru_state[node_index] = 1;
+                // Move to the right child
+                node_index = 2 * node_index + 2;
+            end
         end
     end
-
-    // Update the cache set's LRU state
-    cache.sets[set_index] = cache_set;
 endtask
 
 task process_write_request_data_cache(input logic [ADDRESS_WIDTH-1:0] address);
