@@ -395,6 +395,7 @@ function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
     integer bit1;
     integer bit_length;
     logic [ASSOCIATIVITY-2:0] accessed_index;
+    integer victim_line;
     begin
         accessed_index = cache.sets[set_index].lru_state; // Get the LRU state of the set
         node_index = 0; // Start at the root of the tree
@@ -452,6 +453,7 @@ task update_lru_on_access(input logic [INDEX_BITS-1:0] set_index, input integer 
                 node_index = 2 * node_index + 2;
             end
         end
+        $display("Updated LRU state for set %0d to %b ", set_index, cache.sets[set_index].lru_state);
     end
 endtask
 
