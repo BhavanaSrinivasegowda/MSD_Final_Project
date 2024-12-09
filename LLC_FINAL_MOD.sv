@@ -380,23 +380,18 @@ task Snooped_invalidate_request(input logic [ADDRESS_WIDTH-1:0] address);
 endtask
 
 function integer select_victim_line(input logic [INDEX_BITS-1:0] index);
-    int evict_index;
+    int evict_index = 0;
     int level;
 
 
     // Traverse the pseudo LRU tree to find the line to evict
-    for (level = 0; level < $clog2(ASSOCIATIVITY); level++) begin
-        // Ensure that we do not exceed the bounds of lru_state
-        if (evict_index >= ASSOCIATIVITY - 1) begin
-            // This should not happen, but just in case, return an invalid index
-            return -1; // Indicate an error
-        end
+    for (level = 0; level < $clog2(ASSOCIATIVITY); level++) begi
 
         // Move left or right based on the current state of lru_state
         if (cache.sets[index].lru_state[evict_index] == 0) begin
-            evict_index = (evict_index << 1); // Go left
+            evict_index = (evict_index << 1) | 1; // Go left
         end else begin
-            evict_index = (evict_index << 1) | 1; // Go right
+            evict_index = (evict_index << 1); // Go right
         end
     end
 
