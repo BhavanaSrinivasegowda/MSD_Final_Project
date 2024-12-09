@@ -394,7 +394,7 @@ function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
     integer level;
     integer bit1;
     integer bit_length;
-    integer accessed_index;
+    logic [ASSOCIATIVITY-2:0] accessed_index;
     begin
         accessed_index = cache.sets[set_index].lru_state; // Get the LRU state of the set
         node_index = 0; // Start at the root of the tree
@@ -404,15 +404,16 @@ function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
         for (level = 0; level < bit_length; level++) begin
             // Determine the bit1 to access based on the level
             bit1 = (accessed_index >> (bit_length - 1 - level)) & 1;
+            $display("bit1: %0d", bit1);
 
             if (bit1 == 1) begin
                 // Update the LRU bit1 to 0
-                cache.sets[set_index].lru_state[node_index] = 0;
+                // cache.sets[set_index].lru_state[node_index] = 0;
                 // Move to the left child
                 node_index = 2 * node_index + 1;
             end else begin
                 // Update the LRU bit1 to 1
-                cache.sets[set_index].lru_state[node_index] = 1;
+                // cache.sets[set_index].lru_state[node_index] = 1;
                 // Move to the right child
                 node_index = 2 * node_index + 2;
             end
@@ -619,7 +620,7 @@ function evict_line(input logic [INDEX_BITS-1:0] index, int line_index, logic [A
     BusOperation(`WRITE, address, `NOHIT);
     cache.sets[index].lines[line_index].mesi_state = INVALID;
     $display("%h is evicted from the cache", address);
-    messageToCache(`EVICTLINE, address);
+    MessageToCache(`EVICTLINE, address);
     end
     else begin
     end
