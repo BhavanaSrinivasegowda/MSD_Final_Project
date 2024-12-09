@@ -1,4 +1,3 @@
-
 /**
  * @file cache_simulator.sv
  * @brief Cache Simulator for ECE 485/585 Final Project
@@ -53,10 +52,10 @@ module cache_simulator1;
 
     // Cache Statistics Structure
     typedef struct {
-        integer read_count;    // Number of cache read operations
-        integer write_count;   // Number of cache write operations
-        integer hit_count;     // Number of cache hits
-        integer miss_count;    // Number of cache misses
+        integer read_count = 0;    // Number of cache read operations
+        integer write_count = 0;   // Number of cache write operations
+        integer hit_count = 0;     // Number of cache hits
+        integer miss_count = 0;    // Number of cache misses
     } CacheStats_t;
 
     // Bus Operation Types
@@ -393,8 +392,9 @@ endtask
 function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
     integer node_index;
     integer level;
-    integer bit;
+    integer bit1;
     integer bit_length;
+    integer accessed_index;
     begin
         accessed_index = cache.sets[set_index].lru_state; // Get the LRU state of the set
         node_index = 0; // Start at the root of the tree
@@ -402,16 +402,16 @@ function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
 
         // Traverse the pseudo LRU tree to update the LRU bits
         for (level = 0; level < bit_length; level++) begin
-            // Determine the bit to access based on the level
-            bit = (accessed_index >> (bit_length - 1 - level)) & 1;
+            // Determine the bit1 to access based on the level
+            bit1 = (accessed_index >> (bit_length - 1 - level)) & 1;
 
-            if (bit == 1) begin
-                // Update the LRU bit to 0
+            if (bit1 == 1) begin
+                // Update the LRU bit1 to 0
                 cache.sets[set_index].lru_state[node_index] = 0;
                 // Move to the left child
                 node_index = 2 * node_index + 1;
             end else begin
-                // Update the LRU bit to 1
+                // Update the LRU bit1 to 1
                 cache.sets[set_index].lru_state[node_index] = 1;
                 // Move to the right child
                 node_index = 2 * node_index + 2;
@@ -426,7 +426,7 @@ endfunction
 task update_lru_on_access(input logic [INDEX_BITS-1:0] set_index, input integer accessed_index);
     integer node_index;
     integer level;
-    integer bit;
+    integer bit1;
     integer bit_length;
     begin
         node_index = 0; // Start at the root of the tree
@@ -434,16 +434,16 @@ task update_lru_on_access(input logic [INDEX_BITS-1:0] set_index, input integer 
 
         // Traverse the pseudo LRU tree to update the LRU bits
         for (level = 0; level < bit_length; level++) begin
-            // Determine the bit to access based on the level
-            bit = (accessed_index >> (bit_length - 1 - level)) & 1;
+            // Determine the bit1 to access based on the level
+            bit1 = (accessed_index >> (bit_length - 1 - level)) & 1;
 
-            if (bit == 0) begin
-                // Update the LRU bit to 0
+            if (bit1 == 0) begin
+                // Update the LRU bit1 to 0
                 cache.sets[set_index].lru_state[node_index] = 0;
                 // Move to the left child
                 node_index = 2 * node_index + 1;
             end else begin
-                // Update the LRU bit to 1
+                // Update the LRU bit1 to 1
                 cache.sets[set_index].lru_state[node_index] = 1;
                 // Move to the right child
                 node_index = 2 * node_index + 2;
