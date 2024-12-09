@@ -41,7 +41,7 @@ module cache_simulator1;
 
     // Cache Set Structure
     typedef struct {
-        CacheLine_t lines [0:ASSOCIATIVITY-1];       // Array of cache lines in the set
+        CacheLine_t lines [ASSOCIATIVITY-1:0];       // Array of cache lines in the set
         logic [ASSOCIATIVITY-2:0] lru_state;         // Pseudo-LRU bits for replacement policy, 15 bits per set
     } CacheSet_t;
 
@@ -418,7 +418,8 @@ function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
                 node_index = 2 * node_index + 2;
             end
         end
-        select_victim_line = node_index;
+        victim_line = node_index - (2**bit_length - 1);
+        select_victim_line = victim_line;
         $display("Selected victim line: %0d", select_victim_line);
     end
 endfunction
