@@ -1,11 +1,9 @@
 /**
  * @file cache_simulator.sv
  * @brief Cache Simulator for ECE 485/585 Final Project
- * Xiang Li
  * This module simulates a last level cache (LLC) with MESI coherence protocol,
  * pseudo-LRU replacement policy, and supports bus operations and interactions
  * with higher-level caches.
- * MESI part is implemented in this file.
  * The cache is 16MB, 16-way set associative, with 64-byte lines.
  */
 
