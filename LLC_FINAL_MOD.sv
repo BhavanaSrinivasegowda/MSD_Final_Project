@@ -280,7 +280,7 @@ task Snooped_read_request(input logic [ADDRESS_WIDTH-1:0] address);
     logic [INDEX_BITS-1:0] index;
     logic [OFFSET_BITS-1:0] offset;
     integer set_index, line_index;
-    integer hit_type = 4;
+    integer hit_type;
     
         decode_address(address, tag, index, offset);
         // Iterate over all cache lines in the set
@@ -300,12 +300,12 @@ task Snooped_read_request(input logic [ADDRESS_WIDTH-1:0] address);
                     cache.sets[index].lines[line_index].mesi_state = SHARED;
                    // PutSnoopResult(address, `HITM);
                     hit_type = 3;
+                    end
 
                 else begin
                     hit_type = 4;
                 end 
             end
-        end
         end
         case(hit_type)
             1: begin
@@ -355,7 +355,7 @@ task Snooped_RWIM_request(input logic [ADDRESS_WIDTH-1:0] address);
     logic [INDEX_BITS-1:0] index;
     logic [OFFSET_BITS-1:0] offset;
     integer set_index, line_index;
-    integer hit_type = 4;
+    integer hit_type ;
     decode_address(address, tag, index, offset);
         // Iterate over all cache lines in the set
         for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
@@ -374,12 +374,13 @@ task Snooped_RWIM_request(input logic [ADDRESS_WIDTH-1:0] address);
                 else if (cache.sets[index].lines[line_index].mesi_state == MODIFIED) begin
                     cache.sets[index].lines[line_index].mesi_state = INVALID;
                     hit_type = 3;
+                    end
                 else begin
                     hit_type = 4;
                 end
             end
         end
-        end
+        
         case(hit_type)
             1: begin
                 if(NormalMode) begin
