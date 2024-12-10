@@ -300,14 +300,13 @@ task Snooped_read_request(input logic [ADDRESS_WIDTH-1:0] address);
                     cache.sets[index].lines[line_index].mesi_state = SHARED;
                    // PutSnoopResult(address, `HITM);
                     hit_type = 3;
-                end
+                    end
 
                 else begin
                     hit_type = 4;
                 end 
             end
         end
-
         case(hit_type)
             1: begin
                 if(NormalMode) begin
@@ -356,7 +355,7 @@ task Snooped_RWIM_request(input logic [ADDRESS_WIDTH-1:0] address);
     logic [INDEX_BITS-1:0] index;
     logic [OFFSET_BITS-1:0] offset;
     integer set_index, line_index;
-    integer hit_type;
+    integer hit_type ;
     decode_address(address, tag, index, offset);
         // Iterate over all cache lines in the set
         for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
@@ -375,13 +374,13 @@ task Snooped_RWIM_request(input logic [ADDRESS_WIDTH-1:0] address);
                 else if (cache.sets[index].lines[line_index].mesi_state == MODIFIED) begin
                     cache.sets[index].lines[line_index].mesi_state = INVALID;
                     hit_type = 3;
-                end
+                    end
                 else begin
                     hit_type = 4;
                 end
             end
         end
-
+        
         case(hit_type)
             1: begin
                 if(NormalMode) begin
@@ -494,9 +493,7 @@ function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
         for (level = 0; level < bit_length; level++) begin
             // Determine the bit1 to access based on the level
             bit1 = cache.sets[set_index].lru_state[node_index];
-            if (NormalMode) begin
             $display("Node: %0d LUR bits: %0d", node_index , bit1);
-            end
 
             if (bit1 == 1) begin
                 // Update the LRU bit1 to 0
