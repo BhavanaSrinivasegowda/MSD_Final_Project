@@ -280,46 +280,59 @@ task Snooped_read_request(input logic [ADDRESS_WIDTH-1:0] address);
     logic [INDEX_BITS-1:0] index;
     logic [OFFSET_BITS-1:0] offset;
     integer set_index, line_index;
-    logic hit_found;
+    integer hit_type = 4;
     
         decode_address(address, tag, index, offset);
         // Iterate over all cache lines in the set
         for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
             if (cache.sets[index].lines[line_index].tag == tag) begin
                 // Hit
-                hit_found = 1;
                 if (cache.sets[index].lines[line_index].mesi_state == EXCLUSIVE) begin
                     cache.sets[index].lines[line_index].mesi_state = SHARED;
-                    if(NormalMode) begin
-                        $display("Cache line in EXCLUSIVE state, transitioning to SHARED state.");
-                    end
+                    hit_type = 1;
                     //PutSnoopResult(address, `HIT);
                 end
                 else if (cache.sets[index].lines[line_index].mesi_state == SHARED) begin
                    // PutSnoopResult(address, `HIT);
-                   if(NormalMode) begin
-                        $display("Cache line in SHARED state, no state transition needed.");
-                    end
+                    hit_type = 2;
                 end
                 else if (cache.sets[index].lines[line_index].mesi_state == MODIFIED) begin
                     cache.sets[index].lines[line_index].mesi_state = SHARED;
                    // PutSnoopResult(address, `HITM);
-                   if(NormalMode) begin
-                        $display("Cache line in MODIFIED state, transitioning to SHARED state.");
-                        BusOperation(`WRITE, address, `HITM);
-                    end
+                    hit_type = 3;
+
+                else begin
+                    hit_type = 4;
+                end 
+            end
+        end
+        case(hit_type)
+            1: begin
+                if(NormalMode) begin
+                    $display("Cache line in EXCLUSIVE state, transitioning to SHARED state.");
+                    PutSnoopResult(address, `HIT);
                 end
             end
-        end
-        if(hit_found)begin
-            if(NormalMode) begin
-                PutSnoopResult(address, `HIT);
+            2: begin
+                if(NormalMode) begin
+                    PutSnoopResult(address, `HIT);
+                    $display("Cache line in SHARED state.");
+                end
             end
-        end else begin
-            if(NormalMode) begin
-                PutSnoopResult(address, `NOHIT);
+            3: begin
+                if(NormalMode) begin
+                    $display("Cache line in MODIFIED state, transitioning to SHARED state.");
+                    PutSnoopResult(address, `HITM);
+                    BusOperation(`WRITE, address, `HITM);
+                end
             end
-        end
+            4: begin
+                if(NormalMode) begin
+                    $display("No hit in the cache.");
+                    PutSnoopResult(address, `NOHIT);
+                end
+            end
+        endcase
 endtask
 
 // Case 4: Snooped write request(Saw an FlushWB,Flush)
@@ -340,7 +353,7 @@ task Snooped_RWIM_request(input logic [ADDRESS_WIDTH-1:0] address);
     logic [INDEX_BITS-1:0] index;
     logic [OFFSET_BITS-1:0] offset;
     integer set_index, line_index;
-    integer hit_type;
+    integer hit_type = 4;
     decode_address(address, tag, index, offset);
         // Iterate over all cache lines in the set
         for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
@@ -359,11 +372,8 @@ task Snooped_RWIM_request(input logic [ADDRESS_WIDTH-1:0] address);
                 else if (cache.sets[index].lines[line_index].mesi_state == MODIFIED) begin
                     cache.sets[index].lines[line_index].mesi_state = INVALID;
                     hit_type = 3;
-
-                end
                 else begin
                     hit_type = 4;
-                    PutSnoopResult(address,`NOHIT);
                 end
             end
         end
@@ -394,8 +404,10 @@ task Snooped_RWIM_request(input logic [ADDRESS_WIDTH-1:0] address);
             4: begin
                 if(NormalMode) begin
                     $display("No hit in the cache.");
+                    PutSnoopResult(address,`NOHIT);
                 end
             end
+        endcase
 endtask
 
 // Case 6: snooped invalidate request
@@ -460,6 +472,7 @@ task Snooped_invalidate_request(input logic [ADDRESS_WIDTH-1:0] address);
                 PutSnoopResult(address, `NOHIT);
             end
         end
+    endcase
 endtask
 
 function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
