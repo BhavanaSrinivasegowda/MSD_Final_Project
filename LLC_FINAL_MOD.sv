@@ -280,30 +280,46 @@ task Snooped_read_request(input logic [ADDRESS_WIDTH-1:0] address);
     logic [INDEX_BITS-1:0] index;
     logic [OFFSET_BITS-1:0] offset;
     integer set_index, line_index;
+    logic hit_found;
     
         decode_address(address, tag, index, offset);
         // Iterate over all cache lines in the set
         for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
             if (cache.sets[index].lines[line_index].tag == tag) begin
                 // Hit
+                hit_found = 1;
                 if (cache.sets[index].lines[line_index].mesi_state == EXCLUSIVE) begin
                     cache.sets[index].lines[line_index].mesi_state = SHARED;
-                    PutSnoopResult(address, `HIT);
+                    if(NormalMode) begin
+                        $display("Cache line in EXCLUSIVE state, transitioning to SHARED state.");
+                    end
+                    //PutSnoopResult(address, `HIT);
                 end
                 else if (cache.sets[index].lines[line_index].mesi_state == SHARED) begin
-                    PutSnoopResult(address, `HIT);
+                   // PutSnoopResult(address, `HIT);
+                   if(NormalMode) begin
+                        $display("Cache line in SHARED state, no state transition needed.");
+                    end
                 end
                 else if (cache.sets[index].lines[line_index].mesi_state == MODIFIED) begin
                     cache.sets[index].lines[line_index].mesi_state = SHARED;
-                    PutSnoopResult(address, `HITM);
-                    BusOperation(`WRITE, address, `HITM);
-                end
-                else begin
-                    PutSnoopResult(address, `NOHIT);
+                   // PutSnoopResult(address, `HITM);
+                   if(NormalMode) begin
+                        $display("Cache line in MODIFIED state, transitioning to SHARED state.");
+                        BusOperation(`WRITE, address, `HITM);
+                    end
                 end
             end
         end
-    
+        if(hit_found)begin
+            if(NormalMode) begin
+                PutSnoopResult(address, `HIT);
+            end
+        end else begin
+            if(NormalMode) begin
+                PutSnoopResult(address, `NOHIT);
+            end
+        end
 endtask
 
 // Case 4: Snooped write request(Saw an FlushWB,Flush)
@@ -324,6 +340,7 @@ task Snooped_RWIM_request(input logic [ADDRESS_WIDTH-1:0] address);
     logic [INDEX_BITS-1:0] index;
     logic [OFFSET_BITS-1:0] offset;
     integer set_index, line_index;
+    integer hit_type;
     decode_address(address, tag, index, offset);
         // Iterate over all cache lines in the set
         for (line_index = 0; line_index < ASSOCIATIVITY; line_index = line_index + 1) begin
@@ -331,25 +348,54 @@ task Snooped_RWIM_request(input logic [ADDRESS_WIDTH-1:0] address);
                 // Hit
                 if (cache.sets[index].lines[line_index].mesi_state == EXCLUSIVE) begin
                     cache.sets[index].lines[line_index].mesi_state = INVALID;
-                    MessageToCache(`INVALIDATELINE, address);
-                    PutSnoopResult(address, `HIT);
+                    hit_type = 1;
+
                 end
                 else if (cache.sets[index].lines[line_index].mesi_state == SHARED) begin
                     cache.sets[index].lines[line_index].mesi_state = INVALID;
+                    hit_type = 2;
+
+                end
+                else if (cache.sets[index].lines[line_index].mesi_state == MODIFIED) begin
+                    cache.sets[index].lines[line_index].mesi_state = INVALID;
+                    hit_type = 3;
+
+                end
+                else begin
+                    hit_type = 4;
+                    PutSnoopResult(address,`NOHIT);
+                end
+            end
+        end
+        case(hit_type)
+            1: begin
+                if(NormalMode) begin
+                    $display("Cache line in EXCLUSIVE state, transitioning to INVALID state.");
                     MessageToCache(`INVALIDATELINE, address);
                     PutSnoopResult(address, `HIT);
                 end
-                else if (cache.sets[index].lines[line_index].mesi_state == MODIFIED) begin
+            end
+            2: begin
+                if(NormalMode) begin
+                    $display("Cache line in SHARED state, transitioning to INVALID state.");
+                    MessageToCache(`INVALIDATELINE, address);
+                    PutSnoopResult(address, `HIT);
+                end
+            end
+            3: begin
+                if(NormalMode) begin
+                    $display("Cache line in MODIFIED state, transitioning to INVALID state.");
                     BusOperation(`WRITE, address, `RWIM);
                     MessageToCache(`GETLINE, address);
                     MessageToCache(`INVALIDATELINE, address);
                     PutSnoopResult(address, `HITM);
                 end
-                else begin
-                    PutSnoopResult(address,`NOHIT);
+            end
+            4: begin
+                if(NormalMode) begin
+                    $display("No hit in the cache.");
                 end
             end
-        end
 endtask
 
 // Case 6: snooped invalidate request
@@ -360,6 +406,7 @@ task Snooped_invalidate_request(input logic [ADDRESS_WIDTH-1:0] address);
     logic [INDEX_BITS-1:0] index;
     logic [OFFSET_BITS-1:0] offset;
     integer set_index, line_index;
+    integer hit_type;
     begin
         decode_address(address, tag, index, offset);
         // Iterate over all cache lines in the set
@@ -368,25 +415,51 @@ task Snooped_invalidate_request(input logic [ADDRESS_WIDTH-1:0] address);
                 // Hit
                 if (cache.sets[index].lines[line_index].mesi_state == EXCLUSIVE) begin
                     cache.sets[index].lines[line_index].mesi_state = INVALID;
-                    MessageToCache(`INVALIDATELINE, address);
-                    PutSnoopResult(address, `HIT);
+                    hit_type = 1;
+
                 end
                 else if (cache.sets[index].lines[line_index].mesi_state == SHARED) begin
                     cache.sets[index].lines[line_index].mesi_state = INVALID;
-                    MessageToCache(`INVALIDATELINE, address);
-                    PutSnoopResult(address, `HIT);
+                    hit_type = 2;
                 end
                 else if (cache.sets[index].lines[line_index].mesi_state == MODIFIED) begin
                     cache.sets[index].lines[line_index].mesi_state = INVALID;
-                    MessageToCache(`INVALIDATELINE, address);
-                    PutSnoopResult(address, `HITM);
+                    hit_type = 3;
                 end
                 else begin
-                    PutSnoopResult(address, `NOHIT);
+                    hit_type = 4;
                 end
             end
         end
     end
+    case(hit_type)
+        1: begin
+            if(NormalMode) begin
+                $display("Cache line in EXCLUSIVE state, transitioning to INVALID state.");
+                MessageToCache(`INVALIDATELINE, address);
+                PutSnoopResult(address, `HIT);
+            end
+        end
+        2: begin
+            if(NormalMode) begin
+                $display("Cache line in SHARED state, transitioning to INVALID state.");
+                MessageToCache(`INVALIDATELINE, address);
+                PutSnoopResult(address, `HIT);
+            end
+        end
+        3: begin
+            if(NormalMode) begin
+                $display("Cache line in MODIFIED state, transitioning to INVALID state.");
+                MessageToCache(`INVALIDATELINE, address);
+                PutSnoopResult(address, `HITM);
+            end
+        end
+        4: begin
+            if(NormalMode) begin
+                $display("No hit in the cache.");
+                PutSnoopResult(address, `NOHIT);
+            end
+        end
 endtask
 
 function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
