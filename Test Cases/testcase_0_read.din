@@ -26,11 +26,5 @@
 0 00000
 0 000000
 0 0000000
-0 f
-0 ff
-0 fff
-0 ffff
-0 fffff
-0 ffffff
-0 fffffff
+0 ffffffff
 9 00000000
