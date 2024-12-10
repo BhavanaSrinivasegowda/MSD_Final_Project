@@ -306,6 +306,7 @@ task Snooped_read_request(input logic [ADDRESS_WIDTH-1:0] address);
                 end 
             end
         end
+        end
         case(hit_type)
             1: begin
                 if(NormalMode) begin
@@ -333,6 +334,7 @@ task Snooped_read_request(input logic [ADDRESS_WIDTH-1:0] address);
                 end
             end
         endcase
+
 endtask
 
 // Case 4: Snooped write request(Saw an FlushWB,Flush)
@@ -376,6 +378,7 @@ task Snooped_RWIM_request(input logic [ADDRESS_WIDTH-1:0] address);
                     hit_type = 4;
                 end
             end
+        end
         end
         case(hit_type)
             1: begin
