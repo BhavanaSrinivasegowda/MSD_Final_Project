@@ -26,13 +26,7 @@
 1 00000
 1 000000
 1 0000000
-1 f
-1 ff
-1 fff
-1 ffff
-1 fffff
-1 ffffff
-1 fffffff
+1 ffffffff
 0 00000002
 1 00000002
 0 01100000
