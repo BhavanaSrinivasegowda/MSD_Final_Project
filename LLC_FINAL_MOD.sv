@@ -394,18 +394,16 @@ function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
     integer level;
     integer bit1;
     integer bit_length;
-    logic [ASSOCIATIVITY-2:0] accessed_index;
     integer victim_line;
     begin
-        accessed_index = cache.sets[set_index].lru_state; // Get the LRU state of the set
         node_index = 0; // Start at the root of the tree
         bit_length = $clog2(ASSOCIATIVITY); // Number of bits in the pseudo LRU tree, 4 bits for 16-way
 
         // Traverse the pseudo LRU tree to update the LRU bits
         for (level = 0; level < bit_length; level++) begin
             // Determine the bit1 to access based on the level
-            bit1 = (accessed_index >> (bit_length - 1 - level)) & 1;
-            $display("bit1: %0d", bit1);
+            bit1 = cache.sets[set_index].lru_state[node_index];
+            $display("Node: %0d LUR bits: %0d", node_index , bit1);
 
             if (bit1 == 1) begin
                 // Update the LRU bit1 to 0
