@@ -662,6 +662,7 @@ string input_name;
 trace_file_reader reader_instance (.n(n), .address(address));
 
 initial begin
+initialize_cache();
 if (!$value$plusargs("mode=%d", NormalMode)) begin
             // Default to normal mode if not specified
             NormalMode = 1;
