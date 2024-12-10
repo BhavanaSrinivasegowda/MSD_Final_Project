@@ -493,8 +493,9 @@ function integer select_victim_line(input logic [INDEX_BITS-1:0] set_index);
         for (level = 0; level < bit_length; level++) begin
             // Determine the bit1 to access based on the level
             bit1 = cache.sets[set_index].lru_state[node_index];
+            if (NormalMode) begin
             $display("Node: %0d LUR bits: %0d", node_index , bit1);
-
+            end
             if (bit1 == 1) begin
                 // Update the LRU bit1 to 0
                 // cache.sets[set_index].lru_state[node_index] = 0;
